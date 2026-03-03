@@ -1,13 +1,19 @@
 import MarkdownEditor from '../components/MarkdownEditor'
 import { downloadMarkdown } from '../storage'
+import { buildMarkdownFromForm } from '../templates'
 
-export default function MarkdownSection({ title, data, template, filename, onChange }) {
+export default function MarkdownSection({ title, sectionType, data, template, filename, onChange }) {
   const content = data?.content || ''
 
   const handleUseTemplate = () => {
     if (!content || window.confirm('Replace current content with the template?')) {
       onChange({ ...data, content: template })
     }
+  }
+
+  const handleFormChange = (formData) => {
+    const built = buildMarkdownFromForm(sectionType, formData)
+    onChange({ ...data, form: formData, content: built })
   }
 
   return (
@@ -32,6 +38,9 @@ export default function MarkdownSection({ title, data, template, filename, onCha
         value={content}
         onChange={(val) => onChange({ ...data, content: val })}
         placeholder={`Start writing the ${title} section…`}
+        sectionType={sectionType}
+        formData={data?.form}
+        onFormChange={handleFormChange}
       />
     </div>
   )

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import Checklist from '../components/Checklist'
 import DiagramUpload from '../components/DiagramUpload'
 import { SYSTEM_DIAGRAM_CHECKLIST, COMPONENT_FIELDS } from '../templates'
@@ -5,6 +6,7 @@ import { generateId } from '../storage'
 
 export default function SystemDiagram({ data, onChange }) {
   const {
+    title = '',
     checklist = {},
     components = [],
     imageData = null,
@@ -12,12 +14,16 @@ export default function SystemDiagram({ data, onChange }) {
     notes = '',
   } = data || {}
 
+  const [newName, setNewName] = useState('')
+
   const update = (updates) => onChange({ ...data, ...updates })
 
   const addComponent = () => {
+    const name = newName.trim()
+    if (!name) return
     const newComponent = {
       id: generateId(),
-      name: 'New Component',
+      name,
       what: '',
       why: '',
       tech: '',
@@ -27,6 +33,7 @@ export default function SystemDiagram({ data, onChange }) {
       failureModes: '',
     }
     update({ components: [...components, newComponent] })
+    setNewName('')
   }
 
   const updateComponent = (id, field, value) => {
@@ -43,6 +50,16 @@ export default function SystemDiagram({ data, onChange }) {
     <div className="section-container">
       <div className="section-header">
         <h1 className="section-title">System Diagram</h1>
+      </div>
+
+      <div className="diagram-title-row">
+        <label className="form-field-label" style={{ marginBottom: 4 }}>Diagram Title</label>
+        <input
+          className="field-input diagram-title-input"
+          value={title}
+          onChange={(e) => update({ title: e.target.value })}
+          placeholder="e.g. High-Level Architecture v2"
+        />
       </div>
 
       <div className="diagram-section">
@@ -77,19 +94,29 @@ export default function SystemDiagram({ data, onChange }) {
 
       <div className="subsection-header">
         <h2 className="subsection-title">Component Breakdown</h2>
-        <button className="btn-primary" onClick={addComponent}>
-          + Add Component
-        </button>
+        <div className="add-component-row">
+          <input
+            className="add-component-input"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && addComponent()}
+            placeholder="Component name…"
+          />
+          <button className="btn-primary" onClick={addComponent} disabled={!newName.trim()}>
+            + Add Component
+          </button>
+        </div>
       </div>
 
       {components.map((component) => (
         <div key={component.id} className="component-card">
           <div className="component-header">
+            <span className="flow-number">Name</span>
             <input
               className="component-name-input"
               value={component.name}
               onChange={(e) => updateComponent(component.id, 'name', e.target.value)}
-              placeholder="Component name"
+              placeholder="Component name…"
             />
             <button
               className="btn-danger-sm"

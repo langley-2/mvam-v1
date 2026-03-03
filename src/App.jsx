@@ -143,6 +143,7 @@ export default function App() {
         return (
           <MarkdownSection
             title="Requirements"
+            sectionType="requirements"
             data={currentVersion.requirements}
             template={SECTION_TEMPLATES.requirements}
             filename="requirements.md"
@@ -153,6 +154,7 @@ export default function App() {
         return (
           <MarkdownSection
             title="Architecture"
+            sectionType="architecture"
             data={currentVersion.architecture}
             template={SECTION_TEMPLATES.architecture}
             filename="architecture.md"
@@ -163,6 +165,7 @@ export default function App() {
         return (
           <MarkdownSection
             title="Scaling & Cost"
+            sectionType="scalingCost"
             data={currentVersion.scalingCost}
             template={SECTION_TEMPLATES.scalingCost}
             filename="scaling-and-cost.md"
@@ -194,6 +197,7 @@ export default function App() {
         return (
           <MarkdownSection
             title="Code Structure"
+            sectionType="codeStructure"
             data={currentVersion.codeStructure}
             template={SECTION_TEMPLATES.codeStructure}
             filename="code-structure.md"

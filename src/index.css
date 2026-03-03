@@ -541,10 +541,12 @@ body {
   min-height: 480px;
 }
 
-.md-panes.md-edit .md-textarea { flex: 1; }
-.md-panes.md-split .md-textarea,
-.md-panes.md-split .md-preview { flex: 1; }
-.md-panes.md-split .md-textarea { border-right: 1px solid var(--border); }
+/* Edit = split view (textarea + preview side-by-side) */
+.md-panes.md-edit .md-textarea,
+.md-panes.md-edit .md-preview { flex: 1; }
+.md-panes.md-edit .md-textarea { border-right: 1px solid var(--border); }
+
+/* Preview = full-width preview only */
 .md-panes.md-preview .md-preview { flex: 1; }
 
 .md-textarea {
@@ -1103,4 +1105,257 @@ body {
   color: var(--text-secondary);
   font-size: 13px;
   background: var(--bg);
+}
+
+/* ─── Markdown Image Button ──────────────────────────── */
+
+.md-img-btn {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+
+.md-img-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ─── Markdown Form ──────────────────────────────────── */
+
+.md-form {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 480px;
+  background: var(--surface);
+}
+
+.md-form-empty {
+  padding: 40px 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.form-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-group-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-field-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+}
+
+.form-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.1s;
+  width: 100%;
+}
+
+.form-input:focus {
+  border-color: var(--border-focus);
+}
+
+.form-textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  resize: vertical;
+  line-height: 1.55;
+  width: 100%;
+  transition: border-color 0.1s;
+}
+
+.form-textarea:focus {
+  border-color: var(--border-focus);
+}
+
+.form-list-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.form-list-prefix {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  min-width: 32px;
+}
+
+.form-inline-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.form-inline-group:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.form-inline-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.form-inline-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.btn-form-add {
+  background: none;
+  border: 1px dashed var(--border);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  transition: all 0.1s;
+  white-space: nowrap;
+}
+
+.btn-form-add:hover {
+  background: var(--accent-bg);
+  border-color: var(--accent);
+}
+
+.btn-form-remove {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: inherit;
+  transition: all 0.1s;
+  flex-shrink: 0;
+}
+
+.btn-form-remove:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+.form-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-table-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 28px;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  padding: 0 2px;
+}
+
+.form-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 28px;
+  gap: 6px;
+  align-items: center;
+}
+
+.form-date-input {
+  width: 150px;
+  flex-shrink: 0;
+}
+
+/* ─── Diagram Title ──────────────────────────────────── */
+
+.diagram-title-row {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.diagram-title-input {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.add-component-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.add-component-input {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.1s;
+  width: 200px;
+}
+
+.add-component-input:focus {
+  border-color: var(--border-focus);
 }

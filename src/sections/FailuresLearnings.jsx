@@ -1,5 +1,5 @@
 import MarkdownEditor from '../components/MarkdownEditor'
-import { SECTION_TEMPLATES } from '../templates'
+import { SECTION_TEMPLATES, buildMarkdownFromForm } from '../templates'
 import { downloadMarkdown } from '../storage'
 
 const RAID_ITEMS = [
@@ -26,6 +26,11 @@ export default function FailuresLearnings({ data, onChange }) {
     }
   }
 
+  const handleFormChange = (formData) => {
+    const built = buildMarkdownFromForm('failuresLearnings', formData)
+    update({ form: formData, content: built })
+  }
+
   return (
     <div className="section-container">
       <div className="section-header">
@@ -48,6 +53,9 @@ export default function FailuresLearnings({ data, onChange }) {
         value={content}
         onChange={(val) => update({ content: val })}
         placeholder="Document failures, postmortems, incidents, and what you learned…"
+        sectionType="failuresLearnings"
+        formData={data?.form}
+        onFormChange={handleFormChange}
       />
 
       <div className="subsection">

@@ -4,7 +4,7 @@ export const loadStore = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) return JSON.parse(raw)
-  } catch (e) {
+  } catch (e) { 
     console.error('Failed to load store:', e)
   }
   return { projects: {} }
