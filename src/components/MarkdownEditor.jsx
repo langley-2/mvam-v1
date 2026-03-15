@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { marked } from 'marked'
 import MarkdownForm from './MarkdownForm'
+import Lightbox from './Lightbox'
 
 // Disable raw HTML passthrough — prevents <script> injection via markdown.
 marked.use({
@@ -12,10 +13,17 @@ marked.use({
 export default function MarkdownEditor({ value, onChange, placeholder, sectionType, formData, onFormChange }) {
   const hasForm = !!sectionType
   const [mode, setMode] = useState('edit')
+  const [lightboxSrc, setLightboxSrc] = useState(null)
   const textareaRef = useRef(null)
   const fileInputRef = useRef(null)
 
   const html = marked.parse(value || '')
+
+  const handlePreviewClick = (e) => {
+    if (e.target.tagName === 'IMG' && e.target.src) {
+      setLightboxSrc(e.target.src)
+    }
+  }
 
   const handleImageFile = (e) => {
     const file = e.target.files[0]
@@ -90,9 +98,15 @@ export default function MarkdownEditor({ value, onChange, placeholder, sectionTy
               spellCheck={false}
             />
           )}
-          <div className="md-preview" dangerouslySetInnerHTML={{ __html: html }} />
+          <div
+            className="md-preview"
+            dangerouslySetInnerHTML={{ __html: html }}
+            onClick={handlePreviewClick}
+          />
         </div>
       )}
+
+      {lightboxSrc && <Lightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   )
 }

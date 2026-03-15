@@ -26,8 +26,8 @@
     "wait-on": "^7.2.0"
   },
   "build": {
-    "appId": "com.mvam.builder",
-    "productName": "MVAM Builder",
+    "appId": "com.taffy.app",
+    "productName": "Taffy",
     "files": [
       "dist/**/*",
       "electron/**/*"

@@ -1,7 +1,9 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
+import Lightbox from './Lightbox'
 
 export default function DiagramUpload({ imageData, link, onImageChange, onLinkChange }) {
   const fileRef = useRef()
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   const handleFile = (file) => {
     if (!file || !file.type.startsWith('image/')) return
@@ -42,7 +44,13 @@ export default function DiagramUpload({ imageData, link, onImageChange, onLinkCh
       >
         {imageData ? (
           <>
-            <img src={imageData} alt="Diagram" className="diagram-preview" />
+            <img
+              src={imageData}
+              alt="Diagram"
+              className="diagram-preview diagram-preview--zoomable"
+              onClick={() => setLightboxOpen(true)}
+              title="Click to enlarge"
+            />
             <div className="diagram-actions">
               <button className="btn-secondary" onClick={() => fileRef.current.click()}>
                 Replace image
@@ -68,6 +76,10 @@ export default function DiagramUpload({ imageData, link, onImageChange, onLinkCh
         style={{ display: 'none' }}
         onChange={handleInputChange}
       />
+
+      {lightboxOpen && imageData && (
+        <Lightbox src={imageData} onClose={() => setLightboxOpen(false)} />
+      )}
     </div>
   )
 }

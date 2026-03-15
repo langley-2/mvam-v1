@@ -1,36 +1,71 @@
 import { useState, useEffect, useCallback } from 'react'
 import Sidebar from './components/Sidebar'
 import SectionNav from './components/SectionNav'
+import Preferences from './components/Preferences'
 import MarkdownSection from './sections/MarkdownSection'
-import SystemDiagram from './sections/SystemDiagram'
-import SequenceDiagram from './sections/SequenceDiagram'
-import OtherDiagrams from './sections/OtherDiagrams'
+import Diagrams from './sections/Diagrams'
 import FailuresLearnings from './sections/FailuresLearnings'
 import Links from './sections/Links'
-import { loadStore, saveStore, createProjectData, createVersionData } from './storage'
+import { loadStore, saveStore, createProjectData, createVersionData, exportVersionFolder, loadPrefs, savePrefs } from './storage'
 import { SECTION_TEMPLATES } from './templates'
 
-const SECTIONS = [
-  { id: 'requirements', label: '1. Requirements', short: 'Requirements', filename: 'requirements.md' },
-  { id: 'architecture', label: '2. Architecture', short: 'Architecture', filename: 'architecture.md' },
-  { id: 'scalingCost', label: '3. Scaling & Cost', short: 'Scaling & Cost', filename: 'scaling-and-cost.md' },
-  { id: 'systemDiagram', label: '4. System Diagram', short: 'System Diagram' },
-  { id: 'sequenceDiagram', label: '5. Sequence Diagram', short: 'Sequence Diagram' },
-  { id: 'otherDiagrams', label: '6. Other Diagrams', short: 'Other Diagrams' },
-  { id: 'codeStructure', label: '7. Code Structure', short: 'Code Structure', filename: 'code-structure.md' },
-  { id: 'failuresLearnings', label: '8. Failures & Learnings', short: 'Failures & Learnings', filename: 'failures-and-learnings.md' },
-  { id: 'links', label: '9. Links', short: 'Links' },
+const BASE_SECTIONS = [
+  { id: 'requirements', label: '1. Requirements', short: 'Requirements' },
+  { id: 'architecture', label: '2. Architecture', short: 'Architecture' },
+  { id: 'scalingCost', label: '3. Scaling & Cost', short: 'Scaling & Cost' },
+  { id: 'diagrams', label: '4. Diagrams', short: 'Diagrams' },
+  { id: 'codeStructure', label: '5. Code Structure', short: 'Code Structure' },
+  { id: 'failuresLearnings', label: '6. Failures & Learnings', short: 'Failures & Learnings' },
+  { id: 'links', label: '7. Links', short: 'Links' },
 ]
+
+function slugify(label) {
+  return label.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-').slice(0, 48) || 'section'
+}
 
 export default function App() {
   const [store, setStore] = useState(() => loadStore())
+  const [prefs, setPrefs] = useState(() => loadPrefs())
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [selectedVersionId, setSelectedVersionId] = useState(null)
   const [selectedSection, setSelectedSection] = useState('requirements')
+  const [showPreferences, setShowPreferences] = useState(false)
+
+  // Apply theme to <html> element so CSS variables cascade everywhere
+  useEffect(() => {
+    const theme = prefs.theme || 'system'
+    if (theme === 'system') {
+      document.documentElement.removeAttribute('data-theme')
+    } else {
+      document.documentElement.setAttribute('data-theme', theme)
+    }
+  }, [prefs.theme])
 
   useEffect(() => {
     saveStore(store)
   }, [store])
+
+  useEffect(() => {
+    savePrefs(prefs)
+  }, [prefs])
+
+  // Effective templates: user overrides take precedence over defaults
+  const effectiveTemplates = { ...SECTION_TEMPLATES, ...prefs.templates }
+
+  // Build dynamic sections list (base + custom)
+  const customSections = prefs.customSections || []
+  const sections = [
+    ...BASE_SECTIONS,
+    ...customSections.map((s, i) => ({
+      id: s.id,
+      label: `${BASE_SECTIONS.length + i + 1}. ${s.label}`,
+      short: s.label,
+    })),
+  ]
+
+  const handlePrefsChange = (updatedPrefs) => {
+    setPrefs(updatedPrefs)
+  }
 
   const currentProject = selectedProjectId ? store.projects[selectedProjectId] : null
   const currentVersion =
@@ -127,13 +162,27 @@ export default function App() {
     [selectedProjectId, selectedVersionId]
   )
 
+  const handleExportVersion = async (projectId, versionId) => {
+    const project = store.projects[projectId]
+    const version = project?.versions[versionId]
+    if (!project || !version) return
+    try {
+      const dirName = await exportVersionFolder(project, version)
+      alert(`Exported "${version.name}" to: ${dirName}`)
+    } catch (err) {
+      if (err.name !== 'AbortError') {
+        alert(`Export failed: ${err.message}`)
+      }
+    }
+  }
+
   const renderSection = () => {
     if (!currentVersion) {
       return (
-        <div className="empty-state">
-          <div className="empty-icon">⬡</div>
+        <div className="empty-state" role="status">
+          <div className="empty-icon" aria-hidden="true">🍬</div>
           <h2>Select a project and version to get started</h2>
-          <p>Create a project in the sidebar, then add a version (e.g. v1) to begin filling out your MVAM template.</p>
+          <p>Create a project in the sidebar, then add a version (e.g. v1) to begin building your architecture template.</p>
         </div>
       )
     }
@@ -145,7 +194,7 @@ export default function App() {
             title="Requirements"
             sectionType="requirements"
             data={currentVersion.requirements}
-            template={SECTION_TEMPLATES.requirements}
+            template={effectiveTemplates.requirements}
             filename="requirements.md"
             onChange={(data) => updateSection('requirements', data)}
           />
@@ -156,7 +205,7 @@ export default function App() {
             title="Architecture"
             sectionType="architecture"
             data={currentVersion.architecture}
-            template={SECTION_TEMPLATES.architecture}
+            template={effectiveTemplates.architecture}
             filename="architecture.md"
             onChange={(data) => updateSection('architecture', data)}
           />
@@ -167,30 +216,16 @@ export default function App() {
             title="Scaling & Cost"
             sectionType="scalingCost"
             data={currentVersion.scalingCost}
-            template={SECTION_TEMPLATES.scalingCost}
+            template={effectiveTemplates.scalingCost}
             filename="scaling-and-cost.md"
             onChange={(data) => updateSection('scalingCost', data)}
           />
         )
-      case 'systemDiagram':
+      case 'diagrams':
         return (
-          <SystemDiagram
-            data={currentVersion.systemDiagram}
-            onChange={(data) => updateSection('systemDiagram', data)}
-          />
-        )
-      case 'sequenceDiagram':
-        return (
-          <SequenceDiagram
-            data={currentVersion.sequenceDiagram}
-            onChange={(data) => updateSection('sequenceDiagram', data)}
-          />
-        )
-      case 'otherDiagrams':
-        return (
-          <OtherDiagrams
-            data={currentVersion.otherDiagrams}
-            onChange={(data) => updateSection('otherDiagrams', data)}
+          <Diagrams
+            data={currentVersion.diagrams}
+            onChange={(data) => updateSection('diagrams', data)}
           />
         )
       case 'codeStructure':
@@ -199,7 +234,7 @@ export default function App() {
             title="Code Structure"
             sectionType="codeStructure"
             data={currentVersion.codeStructure}
-            template={SECTION_TEMPLATES.codeStructure}
+            template={effectiveTemplates.codeStructure}
             filename="code-structure.md"
             onChange={(data) => updateSection('codeStructure', data)}
           />
@@ -218,8 +253,23 @@ export default function App() {
             onChange={(data) => updateSection('links', data)}
           />
         )
-      default:
+      default: {
+        // Custom section
+        const customSection = customSections.find((s) => s.id === selectedSection)
+        if (customSection) {
+          return (
+            <MarkdownSection
+              title={customSection.label}
+              sectionType={selectedSection}
+              data={currentVersion[selectedSection] || { content: '' }}
+              template={customSection.template || `# ${customSection.label}\n\n`}
+              filename={`${slugify(customSection.label)}.md`}
+              onChange={(data) => updateSection(selectedSection, data)}
+            />
+          )
+        }
         return null
+      }
     }
   }
 
@@ -232,27 +282,38 @@ export default function App() {
         onSelectProject={(id) => {
           setSelectedProjectId(id)
           setSelectedVersionId(null)
+          setShowPreferences(false)
         }}
         onSelectVersion={(projectId, versionId) => {
           setSelectedProjectId(projectId)
           setSelectedVersionId(versionId)
           setSelectedSection('requirements')
+          setShowPreferences(false)
         }}
         onCreateProject={handleCreateProject}
         onDeleteProject={handleDeleteProject}
         onRenameProject={handleRenameProject}
         onCreateVersion={handleCreateVersion}
         onDeleteVersion={handleDeleteVersion}
+        onExportVersion={handleExportVersion}
+        onOpenPreferences={() => setShowPreferences((v) => !v)}
+        prefsOpen={showPreferences}
       />
-      <div className="main-area">
-        <SectionNav
-          sections={SECTIONS}
-          selected={selectedSection}
-          onChange={setSelectedSection}
-          disabled={!currentVersion}
-        />
-        <div className="section-content">{renderSection()}</div>
-      </div>
+      <main className="main-area">
+        {showPreferences ? (
+          <Preferences prefs={prefs} onChange={handlePrefsChange} />
+        ) : (
+          <>
+            <SectionNav
+              sections={sections}
+              selected={selectedSection}
+              onChange={setSelectedSection}
+              disabled={!currentVersion}
+            />
+            <div className="section-content" id="main-content">{renderSection()}</div>
+          </>
+        )}
+      </main>
     </div>
   )
 }

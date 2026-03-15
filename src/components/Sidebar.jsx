@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function Sidebar({
   store,
@@ -11,6 +11,9 @@ export default function Sidebar({
   onRenameProject,
   onCreateVersion,
   onDeleteVersion,
+  onExportVersion,
+  onOpenPreferences,
+  prefsOpen,
 }) {
   const [expandedProjects, setExpandedProjects] = useState({})
   const [newProjectName, setNewProjectName] = useState('')
@@ -19,10 +22,24 @@ export default function Sidebar({
   const [showNewVersionFor, setShowNewVersionFor] = useState(null)
   const [editingProject, setEditingProject] = useState(null)
   const [editName, setEditName] = useState('')
+  const [openMenuFor, setOpenMenuFor] = useState(null) // projectId of open options menu
+  const menuRef = useRef(null)
 
   const projects = Object.values(store.projects).sort(
     (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
   )
+
+  // Close the options menu when clicking outside it
+  useEffect(() => {
+    if (!openMenuFor) return
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setOpenMenuFor(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [openMenuFor])
 
   const toggleProject = (projectId) => {
     setExpandedProjects((prev) => ({ ...prev, [projectId]: !prev[projectId] }))
@@ -48,6 +65,7 @@ export default function Sidebar({
   const handleStartRename = (project) => {
     setEditingProject(project.id)
     setEditName(project.name)
+    setOpenMenuFor(null)
   }
 
   const handleSaveRename = (projectId) => {
@@ -57,11 +75,25 @@ export default function Sidebar({
     setEditingProject(null)
   }
 
+  const handleExport = (project) => {
+    setOpenMenuFor(null)
+    if (selectedProjectId === project.id && selectedVersionId) {
+      onExportVersion(project.id, selectedVersionId)
+    } else {
+      const versions = Object.values(project.versions)
+      if (versions.length === 0) {
+        alert('This project has no versions to export.')
+        return
+      }
+      alert('Select a version for this project first, then use Export.')
+    }
+  }
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" aria-label="Projects sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-logo">⬡</span>
-        <span className="sidebar-title">MVAM Builder</span>
+        <span className="sidebar-logo">🍬</span>
+        <span className="sidebar-title">Taffy</span>
       </div>
 
       <div className="sidebar-section-label">Projects</div>
@@ -73,6 +105,7 @@ export default function Sidebar({
           )
           const isExpanded = !!expandedProjects[project.id]
           const isSelected = selectedProjectId === project.id
+          const isMenuOpen = openMenuFor === project.id
 
           return (
             <div key={project.id} className="project-item">
@@ -103,28 +136,60 @@ export default function Sidebar({
                 )}
 
                 <div className="project-actions">
-                  <button
-                    className="icon-btn"
-                    title="Rename"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleStartRename(project)
-                    }}
-                  >
-                    ✎
-                  </button>
-                  <button
-                    className="icon-btn"
-                    title="Delete project"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (window.confirm(`Delete project "${project.name}"? This cannot be undone.`)) {
-                        onDeleteProject(project.id)
-                      }
-                    }}
-                  >
-                    ✕
-                  </button>
+                  {/* Options menu */}
+                  <div className="project-menu-wrapper" ref={isMenuOpen ? menuRef : null}>
+                    <button
+                      className="icon-btn"
+                      title="Project options"
+                      aria-label={`Options for ${project.name}`}
+                      aria-expanded={isMenuOpen}
+                      aria-haspopup="menu"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenMenuFor(isMenuOpen ? null : project.id)
+                      }}
+                    >
+                      ⋯
+                    </button>
+                    {isMenuOpen && (
+                      <div className="project-menu" role="menu" aria-label={`${project.name} options`}>
+                        <button
+                          className="project-menu-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleStartRename(project)
+                          }}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          className="project-menu-item"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleExport(project)
+                          }}
+                        >
+                          Export version…
+                        </button>
+                        <div className="project-menu-divider" role="separator" />
+                        <button
+                          className="project-menu-item project-menu-item--danger"
+                          role="menuitem"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setOpenMenuFor(null)
+                            if (window.confirm(`Delete project "${project.name}"? This cannot be undone.`)) {
+                              onDeleteProject(project.id)
+                            }
+                          }}
+                        >
+                          Delete project
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -141,6 +206,7 @@ export default function Sidebar({
                       <button
                         className="version-delete"
                         title="Delete version"
+                        aria-label={`Delete version ${version.name}`}
                         onClick={(e) => {
                           e.stopPropagation()
                           if (window.confirm(`Delete version "${version.name}"?`)) {
@@ -222,9 +288,18 @@ export default function Sidebar({
             />
           </form>
         ) : (
-          <button className="new-project-btn" onClick={() => setShowNewProject(true)}>
-            + New Project
-          </button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className="new-project-btn" style={{ flex: 1 }} onClick={() => setShowNewProject(true)}>
+              + New Project
+            </button>
+            <button
+              className={`sidebar-prefs-btn${prefsOpen ? ' active' : ''}`}
+              title="Preferences"
+              onClick={onOpenPreferences}
+            >
+              ⚙
+            </button>
+          </div>
         )}
       </div>
     </aside>
