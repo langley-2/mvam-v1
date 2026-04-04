@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Sidebar from './components/Sidebar'
 import SectionNav from './components/SectionNav'
 import Preferences from './components/Preferences'
+import ReviewButton from './components/ReviewButton'
+import ReviewPanel from './components/ReviewPanel'
 import MarkdownSection from './sections/MarkdownSection'
 import Diagrams from './sections/Diagrams'
 import FailuresLearnings from './sections/FailuresLearnings'
 import Links from './sections/Links'
 import { loadStore, saveStore, createProjectData, createVersionData, exportVersionFolder, loadPrefs, savePrefs } from './storage'
+import { getApiKey, setApiKey } from './secureKey'
 import { SECTION_TEMPLATES } from './templates'
+import { callReview, resolveSectionLabel } from './api/review'
 
 const BASE_SECTIONS = [
   { id: 'requirements', label: '1. Requirements', short: 'Requirements' },
@@ -26,10 +30,14 @@ function slugify(label) {
 export default function App() {
   const [store, setStore] = useState(() => loadStore())
   const [prefs, setPrefs] = useState(() => loadPrefs())
+  const [apiKey, setApiKeyState] = useState('')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [selectedVersionId, setSelectedVersionId] = useState(null)
   const [selectedSection, setSelectedSection] = useState('requirements')
   const [showPreferences, setShowPreferences] = useState(false)
+  const [reviewState, setReviewState] = useState(null)
+  // reviewState: null | { status: 'loading' } | { status: 'result', data } | { status: 'error', message }
+  const reviewAbortRef = useRef(null) // AbortController for in-flight review requests
 
   // Apply theme to <html> element so CSS variables cascade everywhere
   useEffect(() => {
@@ -41,6 +49,23 @@ export default function App() {
     }
   }, [prefs.theme])
 
+  // Load API key from secure storage on mount; migrate legacy key from prefs if present
+  useEffect(() => {
+    getApiKey().then((key) => {
+      if (key) {
+        setApiKeyState(key)
+      } else {
+        // Migration: key was previously stored in prefs.apiConfig.key (plain localStorage)
+        const legacyKey = loadPrefs().apiConfig?.key?.trim()
+        if (legacyKey) {
+          setApiKey(legacyKey).then(() => setApiKeyState(legacyKey))
+          // savePrefs will strip the key going forward, so just trigger a re-save
+          setPrefs((p) => ({ ...p }))
+        }
+      }
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     saveStore(store)
   }, [store])
@@ -49,11 +74,59 @@ export default function App() {
     savePrefs(prefs)
   }, [prefs])
 
+  // Derive current project/version early so handleReview can reference them in its deps
+  const currentProject = selectedProjectId ? store.projects[selectedProjectId] : null
+  const currentVersion =
+    currentProject && selectedVersionId ? currentProject.versions[selectedVersionId] : null
+
+  // Reset review panel (and abort any in-flight request) when section/version changes
+  useEffect(() => {
+    if (reviewAbortRef.current) {
+      reviewAbortRef.current.abort()
+      reviewAbortRef.current = null
+    }
+    setReviewState(null)
+  }, [selectedSection, selectedVersionId, showPreferences])
+
+  const handleReview = useCallback(async () => {
+    if (!currentVersion || !selectedSection) return
+
+    // Abort any previous in-flight request
+    if (reviewAbortRef.current) reviewAbortRef.current.abort()
+    const controller = new AbortController()
+    reviewAbortRef.current = controller
+
+    setReviewState({ status: 'loading' })
+
+    const apiConfig = prefs.apiConfig || {}
+    try {
+      const result = await callReview({
+        apiKey,
+        model: apiConfig.model,
+        provider: apiConfig.provider || 'openai',
+        sectionId: selectedSection,
+        sectionData: currentVersion[selectedSection],
+        customSections: prefs.customSections || [],
+        signal: controller.signal,
+      })
+      // Only update if this request wasn't cancelled
+      if (!controller.signal.aborted) {
+        setReviewState({ status: 'result', data: result })
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return // Silently ignore cancellations
+      if (!controller.signal.aborted) {
+        setReviewState({ status: 'error', message: err.message || 'Review failed.' })
+      }
+    }
+  }, [currentVersion, selectedSection, prefs, apiKey])
+
   // Effective templates: user overrides take precedence over defaults
   const effectiveTemplates = { ...SECTION_TEMPLATES, ...prefs.templates }
 
   // Build dynamic sections list (base + custom)
   const customSections = prefs.customSections || []
+  const isApiConfigured = !!apiKey.trim()
   const sections = [
     ...BASE_SECTIONS,
     ...customSections.map((s, i) => ({
@@ -66,10 +139,6 @@ export default function App() {
   const handlePrefsChange = (updatedPrefs) => {
     setPrefs(updatedPrefs)
   }
-
-  const currentProject = selectedProjectId ? store.projects[selectedProjectId] : null
-  const currentVersion =
-    currentProject && selectedVersionId ? currentProject.versions[selectedVersionId] : null
 
   const handleCreateProject = (name) => {
     const project = createProjectData(name)
@@ -301,7 +370,15 @@ export default function App() {
       />
       <main className="main-area">
         {showPreferences ? (
-          <Preferences prefs={prefs} onChange={handlePrefsChange} />
+          <Preferences
+              prefs={prefs}
+              onChange={handlePrefsChange}
+              apiKey={apiKey}
+              onKeyChange={(key) => {
+                setApiKeyState(key)
+                setApiKey(key)
+              }}
+            />
         ) : (
           <>
             <SectionNav
@@ -311,6 +388,20 @@ export default function App() {
               disabled={!currentVersion}
             />
             <div className="section-content" id="main-content">{renderSection()}</div>
+            {currentVersion && (
+              <ReviewButton
+                onClick={handleReview}
+                isLoading={reviewState?.status === 'loading'}
+                isConfigured={isApiConfigured}
+              />
+            )}
+            {reviewState && currentVersion && (
+              <ReviewPanel
+                state={reviewState}
+                sectionLabel={resolveSectionLabel(selectedSection, customSections)}
+                onClose={() => setReviewState(null)}
+              />
+            )}
           </>
         )}
       </main>

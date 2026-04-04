@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { marked } from 'marked'
 import { SECTION_TEMPLATES } from '../templates'
 import { generateId } from '../storage'
+import { PROVIDERS } from '../api/review'
 
 const BUILT_IN_SECTIONS = [
   { id: 'requirements', label: 'Requirements' },
@@ -11,7 +12,7 @@ const BUILT_IN_SECTIONS = [
   { id: 'failuresLearnings', label: 'Failures & Learnings' },
 ]
 
-export default function Preferences({ prefs, onChange }) {
+export default function Preferences({ prefs, onChange, apiKey, onKeyChange }) {
   const [activeId, setActiveId] = useState('requirements')
   const [mode, setMode] = useState('edit')
   const [newSectionName, setNewSectionName] = useState('')
@@ -21,7 +22,8 @@ export default function Preferences({ prefs, onChange }) {
   const customSections = prefs.customSections || []
   const isBuiltIn = BUILT_IN_SECTIONS.some((s) => s.id === activeId)
   const isAppearance = activeId === '__appearance__'
-  const isCustom = !isBuiltIn && !isAppearance
+  const isApi = activeId === '__api__'
+  const isCustom = !isBuiltIn && !isAppearance && !isApi
 
   const currentTemplate = isBuiltIn
     ? (prefs.templates[activeId] ?? SECTION_TEMPLATES[activeId] ?? '')
@@ -38,7 +40,11 @@ export default function Preferences({ prefs, onChange }) {
     ? BUILT_IN_SECTIONS.find((s) => s.id === activeId)?.label
     : isCustom
     ? customSections.find((s) => s.id === activeId)?.label
-    : 'Appearance'
+    : isAppearance
+    ? 'Appearance'
+    : isApi
+    ? 'API'
+    : 'Preferences'
 
   const handleTemplateChange = (value) => {
     if (isBuiltIn) {
@@ -125,7 +131,11 @@ export default function Preferences({ prefs, onChange }) {
               <button
                 className="prefs-section-delete-btn"
                 onClick={() => {
-                  if (window.confirm(`Delete section "${s.label}"? This will not remove data from existing versions.`)) {
+                  if (
+                    window.confirm(
+                      `Delete section "${s.label}"? This will not remove data from existing versions.`
+                    )
+                  ) {
                     handleDeleteSection(s.id)
                   }
                 }}
@@ -166,10 +176,7 @@ export default function Preferences({ prefs, onChange }) {
             />
           </form>
         ) : (
-          <button
-            className="prefs-add-section-btn"
-            onClick={() => setAddingSection(true)}
-          >
+          <button className="prefs-add-section-btn" onClick={() => setAddingSection(true)}>
             + Add section
           </button>
         )}
@@ -186,12 +193,28 @@ export default function Preferences({ prefs, onChange }) {
               Appearance
             </button>
           </li>
+          <li>
+            <button
+              className={`prefs-section-btn ${isApi ? 'active' : ''}`}
+              onClick={() => setActiveId('__api__')}
+              aria-current={isApi ? 'page' : undefined}
+            >
+              AI Review API
+              {prefs.apiConfig?.key && (
+                <span className="prefs-custom-badge" aria-label="configured">
+                  on
+                </span>
+              )}
+            </button>
+          </li>
         </ul>
       </nav>
 
-      <div className="prefs-main" role="region" aria-label={`${activeLabel ?? 'Preferences'} settings`}>
+      <div className="prefs-main" role="region" aria-label={`${activeLabel} settings`}>
         {isAppearance ? (
           <AppearancePanel prefs={prefs} onChange={onChange} />
+        ) : isApi ? (
+          <ApiPanel prefs={prefs} onChange={onChange} apiKey={apiKey} onKeyChange={onKeyChange} />
         ) : (
           <>
             <div className="prefs-header">
@@ -262,6 +285,8 @@ export default function Preferences({ prefs, onChange }) {
   )
 }
 
+// ─── Appearance panel ─────────────────────────────────────────────────────────
+
 function AppearancePanel({ prefs, onChange }) {
   const theme = prefs.theme || 'system'
 
@@ -317,10 +342,7 @@ function AppearancePanel({ prefs, onChange }) {
                 style={{ background: preview.bg }}
               >
                 <div className="theme-option-swatch-bar" style={{ background: preview.sidebar }} />
-                <div
-                  className="theme-option-swatch-dot"
-                  style={{ background: preview.accent }}
-                />
+                <div className="theme-option-swatch-dot" style={{ background: preview.accent }} />
               </div>
               <div className="theme-option-info">
                 <div className="theme-option-label">{label}</div>
@@ -330,6 +352,113 @@ function AppearancePanel({ prefs, onChange }) {
           ))}
         </div>
       </fieldset>
+    </div>
+  )
+}
+
+// ─── API panel ────────────────────────────────────────────────────────────────
+
+function ApiPanel({ prefs, onChange, apiKey, onKeyChange }) {
+  const config = prefs.apiConfig || { provider: 'openai', model: 'gpt-4o-mini' }
+  const [showKey, setShowKey] = useState(false)
+
+  const update = (updates) => {
+    onChange({ ...prefs, apiConfig: { ...config, ...updates } })
+  }
+
+
+  return (
+    <div>
+      <div className="prefs-header">
+        <div>
+          <h2 className="prefs-title">AI Review API</h2>
+          <p className="prefs-desc">
+            Connect Taffy to an AI provider to enable per-section architecture reviews.
+          </p>
+        </div>
+      </div>
+
+      <div className="api-security-notice" role="note" aria-label="Security information">
+        <strong>Security:</strong> Your API key is encrypted and stored on this device only using
+        your operating system's secure storage. It is never included in project exports, never sent
+        anywhere except your chosen AI provider, and is never accessible to other users.
+      </div>
+
+      <div className="ai-disclosure" role="note" aria-label="AI service disclosure">
+        <strong>Third-party AI services.</strong> When you request a review, your section content
+        (text and any uploaded images) is sent to the AI provider you have selected. These services
+        are operated by third parties — Taffy has no control over how they process or retain your
+        data. AI-generated reviews may be inaccurate, incomplete, or misleading. You are responsible
+        for reviewing all AI output before acting on it, and for ensuring any content you submit is
+        appropriate to share with your chosen provider.
+      </div>
+
+      <div className="api-fields">
+        {/* Provider */}
+        <div className="api-field">
+          <label className="form-field-label" htmlFor="api-provider">
+            Provider
+          </label>
+          <select
+            id="api-provider"
+            className="api-select"
+            value={config.provider || 'openai'}
+            onChange={(e) => update({ provider: e.target.value })}
+          >
+            {Object.entries(PROVIDERS).map(([key, p]) => (
+              <option key={key} value={key}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* API key */}
+        <div className="api-field">
+          <label className="form-field-label" htmlFor="api-key">
+            API Key
+          </label>
+          <div className="api-key-row">
+            <input
+              id="api-key"
+              type={showKey ? 'text' : 'password'}
+              className="api-key-input"
+              value={apiKey || ''}
+              onChange={(e) => onKeyChange(e.target.value)}
+              placeholder="sk-…"
+              autoComplete="new-password"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-describedby="api-key-hint"
+            />
+            <button
+              type="button"
+              className="api-key-toggle"
+              onClick={() => setShowKey((v) => !v)}
+              aria-label={showKey ? 'Hide API key' : 'Show API key'}
+            >
+              {showKey ? 'Hide' : 'Show'}
+            </button>
+          </div>
+          <p className="api-field-hint" id="api-key-hint">
+            Stored locally on this device only. Never shared or exported.
+          </p>
+        </div>
+
+        {/* Clear key */}
+        {apiKey && (
+          <button
+            className="btn-danger-sm"
+            onClick={() => {
+              if (window.confirm('Remove your API key?')) {
+                onKeyChange('')
+              }
+            }}
+          >
+            Remove API key
+          </button>
+        )}
+      </div>
     </div>
   )
 }

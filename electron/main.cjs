@@ -1,5 +1,6 @@
-const { app, BrowserWindow, shell } = require('electron')
+const { app, BrowserWindow, shell, ipcMain, safeStorage } = require('electron')
 const path = require('path')
+const fs = require('fs')
 
 const isDev = process.env.VITE_DEV_SERVER_URL != null
 
@@ -12,6 +13,46 @@ function isSafeExternalUrl(url) {
   }
 }
 
+// ─── Secure key storage ───────────────────────────────────────────────────────
+
+function getSecureFilePath() {
+  return path.join(app.getPath('userData'), 'secure.json')
+}
+
+ipcMain.handle('safe-key:set', (_event, key) => {
+  if (!safeStorage.isEncryptionAvailable()) return false
+  try {
+    const encrypted = safeStorage.encryptString(String(key))
+    fs.writeFileSync(getSecureFilePath(), JSON.stringify({ key: encrypted.toString('base64') }), 'utf8')
+    return true
+  } catch {
+    return false
+  }
+})
+
+ipcMain.handle('safe-key:get', () => {
+  if (!safeStorage.isEncryptionAvailable()) return ''
+  try {
+    const raw = fs.readFileSync(getSecureFilePath(), 'utf8')
+    const { key } = JSON.parse(raw)
+    if (!key) return ''
+    return safeStorage.decryptString(Buffer.from(key, 'base64'))
+  } catch {
+    return ''
+  }
+})
+
+ipcMain.handle('safe-key:clear', () => {
+  try {
+    fs.unlinkSync(getSecureFilePath())
+  } catch {
+    // File may not exist — that's fine
+  }
+  return true
+})
+
+// ─── Window ───────────────────────────────────────────────────────────────────
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
@@ -23,6 +64,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
     show: false,
     backgroundColor: '#111827',

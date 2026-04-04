@@ -38,7 +38,10 @@ export const loadPrefs = () => {
 
 export const savePrefs = (prefs) => {
   try {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
+    // API key is managed by secureKey.js — never persist it in localStorage
+    const { key: _key, ...apiConfig } = prefs.apiConfig || {}
+    const toSave = { ...prefs, apiConfig }
+    localStorage.setItem(PREFS_KEY, JSON.stringify(toSave))
   } catch (e) {
     console.error('Failed to save prefs:', e)
   }
