@@ -300,20 +300,20 @@ function AppearancePanel({ prefs, onChange }) {
     {
       value: 'light',
       label: 'Light',
-      desc: 'Cloud white & soft blue',
-      preview: { bg: '#f3f8fc', sidebar: '#10283f', accent: '#2476c7' },
+      desc: 'Cloud white & baby blue',
+      preview: { bg: '#f2f8ff', sidebar: '#dceeff', accent: '#3277b2' },
     },
     {
       value: 'dark',
       label: 'Dark',
-      desc: 'Midnight navy & blue',
-      preview: { bg: '#11283e', sidebar: '#10283f', accent: '#7cc6fa' },
+      desc: 'Rich twilight blue',
+      preview: { bg: '#172f58', sidebar: '#132d58', accent: '#9ed4ff' },
     },
     {
       value: 'system',
       label: 'System',
       desc: 'Follow OS preference',
-      preview: { bg: 'linear-gradient(135deg, #f3f8fc 50%, #11283e 50%)', sidebar: '#10283f', accent: '#2476c7' },
+      preview: { bg: 'linear-gradient(135deg, #f2f8ff 50%, #172f58 50%)', sidebar: 'linear-gradient(135deg, #dceeff 50%, #132d58 50%)', accent: '#3277b2' },
     },
   ]
 
