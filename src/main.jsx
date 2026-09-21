@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client'
 import App from './App'
 import './index.css'
 
+// Browser/Windows layouts keep normal padding; macOS reserves native controls.
+document.documentElement.dataset.platform = window.electronAPI?.platform || 'browser'
+
 // Inject skip-to-content link before the React root (WCAG 2.4.1)
 const skipLink = document.createElement('a')
 skipLink.href = '#main-content'

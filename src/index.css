@@ -1,4 +1,5 @@
 :root {
+  --app-header-height: 64px;
   /* Sidebar — deep navy */
   --sidebar-bg: #10283f;
   --sidebar-border: #1b354d;
@@ -148,21 +149,27 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* Left padding clears traffic lights (red/yellow/green, ~x:62).
-     Top/bottom vertically centres logo at ~y:14, matching trafficLightPosition. */
-  padding: 9px 16px 9px 72px;
+  height: var(--app-header-height);
+  padding: 0 20px;
   border-bottom: 1px solid var(--sidebar-border);
   flex-shrink: 0;
   -webkit-app-region: drag;
 }
 
-.sidebar-header * {
-  -webkit-app-region: no-drag;
+/* Reserve space only where native macOS controls occupy the content area.
+   Their centre and the brand share the 64px header's vertical midpoint. */
+[data-platform="darwin"] .sidebar-header {
+  padding-left: 100px;
 }
 
 .sidebar-logo {
-  font-size: 18px;
-  color: var(--accent);
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  user-select: none;
 }
 
 .sidebar-title {
@@ -170,6 +177,8 @@ body {
   font-weight: 700;
   color: var(--sidebar-text);
   letter-spacing: -0.01em;
+  line-height: 1;
+  user-select: none;
 }
 
 .sidebar-section-label {
@@ -418,6 +427,7 @@ body {
 
 .section-nav {
   display: flex;
+  height: var(--app-header-height);
   gap: 0;
   padding: 0 8px;
   border-bottom: 1px solid var(--border);
@@ -3130,7 +3140,6 @@ body {
 .guided-prompt p { max-width: 780px; color: var(--text-secondary); }
 .guided-prompt small { display: block; margin-top: 8px; color: var(--text-secondary); }
 .guided-prompt button { flex-shrink: 0; }
-.sidebar-logo { width: 32px; height: 32px; border-radius: 8px; }
 .guided-toggle input {
   appearance: none;
   width: 38px;

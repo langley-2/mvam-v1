@@ -153,7 +153,8 @@ function createWindow() {
     height: 900,
     minWidth: 960,
     minHeight: 640,
-    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 14 } } : {}),
+    // Align native controls with the centre of the renderer's 64px header.
+    ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 20, y: 25 } } : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
