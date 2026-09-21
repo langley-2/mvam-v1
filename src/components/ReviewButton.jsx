@@ -1,9 +1,9 @@
-export default function ReviewButton({ onClick, isLoading, isConfigured }) {
+export default function ReviewButton({ onClick, isLoading, isConfigured, guided }) {
   const label = !isConfigured
-    ? 'AI review (add an API key in Preferences → API to enable)'
+    ? `${guided ? 'Practise' : 'Analyze'} with Archie (add an API key in Preferences -> API to enable)`
     : isLoading
-    ? 'Reviewing…'
-    : 'Request AI review of this section'
+    ? 'Archie is analyzing...'
+    : guided ? 'Practise this section with Archie' : 'Analyze this section with Archie'
 
   return (
     <button
@@ -17,14 +17,14 @@ export default function ReviewButton({ onClick, isLoading, isConfigured }) {
       onClick={onClick}
       disabled={isLoading || !isConfigured}
       aria-label={label}
-      title={!isConfigured ? 'Add an API key in Preferences → API to enable AI review' : undefined}
+      title={!isConfigured ? 'Add an API key in Preferences -> API to enable Archie' : undefined}
     >
       {isLoading ? (
         <span className="review-fab-spinner" aria-hidden="true" />
       ) : (
         <span aria-hidden="true">✦</span>
       )}
-      <span className="review-fab-label">{isLoading ? 'Reviewing…' : 'Review'}</span>
+      <span className="review-fab-label">{isLoading ? 'Analyzing...' : guided ? 'Practise with Archie' : 'Analyze with Archie'}</span>
     </button>
   )
 }

@@ -8,7 +8,7 @@ export default function MarkdownForm({ sectionType, formData, onFormChange }) {
   if (sectionType === 'architecture') return <ArchitectureForm form={form} update={update} />
   if (sectionType === 'scalingCost') return <ScalingCostForm form={form} update={update} />
   if (sectionType === 'codeStructure') return <CodeStructureForm form={form} update={update} />
-  if (sectionType === 'failuresLearnings') return <FailuresForm form={form} update={update} />
+  if (sectionType === 'learningsProof') return <LearningsProofForm form={form} update={update} />
   return <div className="md-form-empty">No form available for this section.</div>
 }
 
@@ -89,46 +89,14 @@ function RequirementsForm({ form, update }) {
 // ─── Architecture ─────────────────────────────────────────────────────────────
 
 function ArchitectureForm({ form, update }) {
-  const decisions = form.decisions || [{ decision: '', constraint: '', alternatives: '', tradeoff: '' }]
+  const failureModes = form.failureModes || [{ component: '', mode: '', impact: '', mitigation: '' }]
   const deferred = form.deferred || ['']
 
-  const updateDecision = (i, field, val) =>
-    update({ decisions: decisions.map((d, j) => (j === i ? { ...d, [field]: val } : d)) })
+  const updateFM = (i, field, val) =>
+    update({ failureModes: failureModes.map((r, j) => (j === i ? { ...r, [field]: val } : r)) })
 
   return (
     <div className="md-form">
-      <FormGroup
-        label="Core Decisions"
-        action={
-          <button className="btn-form-add" onClick={() => update({ decisions: [...decisions, { decision: '', constraint: '', alternatives: '', tradeoff: '' }] })}>
-            + Add Decision
-          </button>
-        }
-      >
-        {decisions.map((d, i) => (
-          <div key={i} className="form-inline-group">
-            <div className="form-inline-group-header">
-              <span className="form-inline-label">Decision {i + 1}</span>
-              {decisions.length > 1 && (
-                <button className="btn-form-remove" onClick={() => update({ decisions: decisions.filter((_, j) => j !== i) })}>Remove</button>
-              )}
-            </div>
-            <Field label="Decision — what you chose">
-              <input className="form-input" value={d.decision || ''} onChange={(e) => updateDecision(i, 'decision', e.target.value)} placeholder="…" />
-            </Field>
-            <Field label="Constraint — why">
-              <input className="form-input" value={d.constraint || ''} onChange={(e) => updateDecision(i, 'constraint', e.target.value)} placeholder="…" />
-            </Field>
-            <Field label="Alternatives — what you didn't choose">
-              <input className="form-input" value={d.alternatives || ''} onChange={(e) => updateDecision(i, 'alternatives', e.target.value)} placeholder="…" />
-            </Field>
-            <Field label="Tradeoff — what you gave up">
-              <input className="form-input" value={d.tradeoff || ''} onChange={(e) => updateDecision(i, 'tradeoff', e.target.value)} placeholder="…" />
-            </Field>
-          </div>
-        ))}
-      </FormGroup>
-
       <FormGroup label="System Traits">
         {[
           ['archType', 'Architecture type'],
@@ -147,6 +115,48 @@ function ArchitectureForm({ form, update }) {
       </FormGroup>
 
       <FormGroup
+        label="Critical Failure Modes"
+        action={
+          <button className="btn-form-add" onClick={() => update({ failureModes: [...failureModes, { component: '', mode: '', impact: '', mitigation: '' }] })}>
+            + Add Row
+          </button>
+        }
+      >
+        <div className="form-table form-table--4col">
+          <div className="form-table-header">
+            <span>Component</span><span>Failure mode</span><span>Impact</span><span>Mitigation</span><span />
+          </div>
+          {failureModes.map((row, i) => (
+            <div key={i} className="form-table-row">
+              <input className="form-input" value={row.component || ''} onChange={(e) => updateFM(i, 'component', e.target.value)} placeholder="Component" />
+              <input className="form-input" value={row.mode || ''} onChange={(e) => updateFM(i, 'mode', e.target.value)} placeholder="e.g. DB unavailable" />
+              <input className="form-input" value={row.impact || ''} onChange={(e) => updateFM(i, 'impact', e.target.value)} placeholder="e.g. Full outage" />
+              <input className="form-input" value={row.mitigation || ''} onChange={(e) => updateFM(i, 'mitigation', e.target.value)} placeholder="e.g. Circuit breaker" />
+              {failureModes.length > 1 && (
+                <button className="btn-form-remove" onClick={() => update({ failureModes: failureModes.filter((_, j) => j !== i) })}>×</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </FormGroup>
+
+      <FormGroup label="Degradation Strategy">
+        <textarea className="form-textarea" rows={3} value={form.degradationStrategy || ''} onChange={(e) => update({ degradationStrategy: e.target.value })} placeholder="What happens under partial failure? What stays up? How does the system degrade gracefully?" />
+      </FormGroup>
+
+      <FormGroup label="Recovery Targets">
+        {[
+          ['recoveryRTO', 'RTO — Recovery Time Objective'],
+          ['recoveryRPO', 'RPO — Recovery Point Objective'],
+          ['recoveryMTTR', 'MTTR target'],
+        ].map(([key, label]) => (
+          <Field key={key} label={label}>
+            <input className="form-input" value={form[key] || ''} onChange={(e) => update({ [key]: e.target.value })} placeholder="e.g. < 30 min" />
+          </Field>
+        ))}
+      </FormGroup>
+
+      <FormGroup
         label="Known Tradeoffs / Deferred Decisions"
         action={
           <button className="btn-form-add" onClick={() => update({ deferred: [...deferred, ''] })}>+ Add</button>
@@ -154,7 +164,7 @@ function ArchitectureForm({ form, update }) {
       >
         {deferred.map((item, i) => (
           <div key={i} className="form-list-row">
-            <input className="form-input" value={item} onChange={(e) => { const next = [...deferred]; next[i] = e.target.value; update({ deferred: next }) }} placeholder="Describe a tradeoff or deferred decision…" />
+            <input className="form-input" value={item} onChange={(e) => { const next = [...deferred]; next[i] = e.target.value; update({ deferred: next }) }} placeholder="Describe a tradeoff or open question…" />
             {deferred.length > 1 && (
               <button className="btn-form-remove" onClick={() => update({ deferred: deferred.filter((_, j) => j !== i) })}>×</button>
             )}
@@ -280,9 +290,9 @@ function CodeStructureForm({ form, update }) {
   )
 }
 
-// ─── Failures & Learnings ─────────────────────────────────────────────────────
+// ─── Learnings & Proof ────────────────────────────────────────────────────────
 
-function FailuresForm({ form, update }) {
+function LearningsProofForm({ form, update }) {
   const entries = form.entries || [
     { date: '', title: '', whatHappened: '', rootCause: '', impact: '', patternLearned: '', prevention: '' },
   ]

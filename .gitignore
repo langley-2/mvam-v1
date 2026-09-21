@@ -27,3 +27,15 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Credentials and local-only analysis notes
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secure.json
+agentic_uplift.md
+may_review.md
+build/icon.iconset/

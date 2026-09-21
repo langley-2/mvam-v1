@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'mvam_builder_v1'
+const STORAGE_KEY = 'taffy_v1'
 const PREFS_KEY = 'taffy_prefs_v1'
 
 export const loadStore = () => {
@@ -51,6 +51,8 @@ export const createProjectData = (name) => ({
   id: generateId(),
   name,
   createdAt: new Date().toISOString(),
+  guided: false,
+  interviewContext: '',
   versions: {},
 })
 
@@ -61,6 +63,7 @@ export const createVersionData = (name) => ({
   requirements: { content: '' },
   architecture: { content: '' },
   scalingCost: { content: '' },
+  decisions: { items: [] },
   diagrams: {
     system: {
       title: '',
@@ -81,7 +84,7 @@ export const createVersionData = (name) => ({
     custom: [],
   },
   codeStructure: { content: '' },
-  failuresLearnings: {
+  raidAndLearnings: {
     content: '',
     proofs: {
       performance: false,
@@ -96,6 +99,14 @@ export const createVersionData = (name) => ({
   },
   links: {
     items: [],
+  },
+  repoAnalysis: {
+    source: null,
+    draft: null,
+    lastRun: null,
+    lastAppliedAt: null,
+    appliedSections: [],
+    archieScores: {},
   },
 })
 
@@ -253,28 +264,75 @@ function buildDiagramsMarkdown(diagrams) {
  * This is a pure function (no side effects) so it can be reused
  * by future features such as per-section LLM review.
  */
+export function buildDecisionsMarkdown(decisions) {
+  const items = decisions?.items || []
+  if (!items.length) return '# Decisions\n\n_No decisions recorded._\n'
+
+  const sections = items.map((d) => {
+    const lines = [`## ${d.title || 'Untitled Decision'}`]
+    if (d.status) lines.push(`**Status:** ${d.status.charAt(0).toUpperCase() + d.status.slice(1)}`)
+    if (d.context?.trim()) lines.push(`\n### Context\n${d.context}`)
+    if (d.options?.length) {
+      lines.push('\n### Options')
+      d.options.forEach((opt) => {
+        lines.push(`\n#### ${opt.label || 'Option'}`)
+        if (opt.description?.trim()) lines.push(opt.description)
+        if (opt.pros?.trim()) lines.push(`\n**Pros:**\n${opt.pros}`)
+        if (opt.cons?.trim()) lines.push(`\n**Cons:**\n${opt.cons}`)
+      })
+    }
+    if (d.decision?.trim()) lines.push(`\n### Decision Made\n${d.decision}`)
+    if (d.rationale?.trim()) lines.push(`\n### Rationale\n${d.rationale}`)
+    if (d.implications?.trim()) lines.push(`\n### Implications\n${d.implications}`)
+    return lines.join('\n')
+  })
+
+  return `# Decisions\n\n${sections.join('\n\n---\n\n')}\n`
+}
+
+export function buildRaidMarkdown(raidAndLearnings) {
+  const raid = raidAndLearnings?.raid || {}
+  const lines = ['# RAID Log\n']
+  const quadrants = [
+    ['Risks', raid.risks],
+    ['Assumptions', raid.assumptions],
+    ['Issues', raid.issues],
+    ['Decisions', raid.decisions],
+  ]
+  quadrants.forEach(([label, content]) => {
+    lines.push(`## ${label}`)
+    lines.push(content?.trim() || '_Not filled in._')
+    lines.push('')
+  })
+  return lines.join('\n')
+}
+
 export function buildExportFiles(project, version) {
   const files = {}
 
   files['01-requirements.md'] = version.requirements?.content || '# Requirements\n\n_No content added._\n'
-  files['02-architecture.md'] = version.architecture?.content || '# Architecture\n\n_No content added._\n'
-  files['03-scaling-and-cost.md'] = version.scalingCost?.content || '# Scaling & Cost\n\n_No content added._\n'
-  files['05-code-structure.md'] = version.codeStructure?.content || '# Code Structure\n\n_No content added._\n'
-  files['06-failures-and-learnings.md'] = version.failuresLearnings?.content || '# Failures & Learnings\n\n_No content added._\n'
-  files['07-links.md'] = buildLinksMarkdown(version.links)
+  files['02-system-design.md'] = version.architecture?.content || '# System Design\n\n_No content added._\n'
+  files['03-decisions.md'] = buildDecisionsMarkdown(version.decisions)
+  files['04-scaling-and-economics.md'] = version.scalingCost?.content || '# Scaling & Economics\n\n_No content added._\n'
+  files['06-implementation-structure.md'] = version.codeStructure?.content || '# Implementation Structure\n\n_No content added._\n'
+  files['07-raid-log.md'] = buildRaidMarkdown(version.raidAndLearnings)
+  files['08-learnings-and-proof.md'] = version.raidAndLearnings?.content || '# Learnings & Proof\n\n_No content added._\n'
+  files['09-references.md'] = buildLinksMarkdown(version.links)
 
   const { md: diagramsMd, images: diagramImages } = buildDiagramsMarkdown(version.diagrams)
-  files['04-diagrams.md'] = diagramsMd
+  files['05-system-diagrams.md'] = diagramsMd
   Object.assign(files, diagramImages)
 
   const tocRows = [
     ['Requirements', '01-requirements.md'],
-    ['Architecture', '02-architecture.md'],
-    ['Scaling & Cost', '03-scaling-and-cost.md'],
-    ['Diagrams', '04-diagrams.md'],
-    ['Code Structure', '05-code-structure.md'],
-    ['Failures & Learnings', '06-failures-and-learnings.md'],
-    ['Links', '07-links.md'],
+    ['System Design', '02-system-design.md'],
+    ['Decisions', '03-decisions.md'],
+    ['Scaling & Economics', '04-scaling-and-economics.md'],
+    ['System Diagrams & Components', '05-system-diagrams.md'],
+    ['Implementation Structure', '06-implementation-structure.md'],
+    ['RAID Log', '07-raid-log.md'],
+    ['Learnings & Proof', '08-learnings-and-proof.md'],
+    ['References', '09-references.md'],
   ]
     .map(([label, file]) => `| ${label} | [${file}](${file}) |`)
     .join('\n')

@@ -4,23 +4,32 @@ import SectionNav from './components/SectionNav'
 import Preferences from './components/Preferences'
 import ReviewButton from './components/ReviewButton'
 import ReviewPanel from './components/ReviewPanel'
+import GuidedPrompt from './components/GuidedPrompt'
+import Overview from './sections/Overview'
 import MarkdownSection from './sections/MarkdownSection'
 import Diagrams from './sections/Diagrams'
-import FailuresLearnings from './sections/FailuresLearnings'
+import Decisions from './sections/Decisions'
+import RaidLog from './sections/RaidLog'
+import LearningsProof from './sections/LearningsProof'
 import Links from './sections/Links'
 import { loadStore, saveStore, createProjectData, createVersionData, exportVersionFolder, loadPrefs, savePrefs } from './storage'
-import { getApiKey, setApiKey } from './secureKey'
+import { canRunReviewInMainProcess, clearApiKey, loadApiKeyState, setApiKey } from './secureKey'
 import { SECTION_TEMPLATES } from './templates'
 import { callReview, resolveSectionLabel } from './api/review'
+import { analyzeRepository, chooseRepositoryDirectory } from './api/repositoryAnalysis'
+import { applyRepositoryDraft, hasExistingSectionContent, upsertRepositoryReference } from './repositoryDraft'
 
 const BASE_SECTIONS = [
+  { id: 'overview', label: 'Overview', short: 'Overview' },
   { id: 'requirements', label: '1. Requirements', short: 'Requirements' },
-  { id: 'architecture', label: '2. Architecture', short: 'Architecture' },
-  { id: 'scalingCost', label: '3. Scaling & Cost', short: 'Scaling & Cost' },
-  { id: 'diagrams', label: '4. Diagrams', short: 'Diagrams' },
-  { id: 'codeStructure', label: '5. Code Structure', short: 'Code Structure' },
-  { id: 'failuresLearnings', label: '6. Failures & Learnings', short: 'Failures & Learnings' },
-  { id: 'links', label: '7. Links', short: 'Links' },
+  { id: 'architecture', label: '2. System Design', short: 'System Design' },
+  { id: 'decisions', label: '3. Decisions', short: 'Decisions' },
+  { id: 'scalingCost', label: '4. Scaling & Economics', short: 'Scaling & Economics' },
+  { id: 'diagrams', label: '5. System Diagrams & Components', short: 'Diagrams & Components' },
+  { id: 'codeStructure', label: '6. Implementation Structure', short: 'Implementation' },
+  { id: 'raidLog', label: '7. RAID Log', short: 'RAID Log' },
+  { id: 'learningsProof', label: '8. Learnings & Proof', short: 'Learnings & Proof' },
+  { id: 'links', label: '9. References', short: 'References' },
 ]
 
 function slugify(label) {
@@ -31,11 +40,13 @@ export default function App() {
   const [store, setStore] = useState(() => loadStore())
   const [prefs, setPrefs] = useState(() => loadPrefs())
   const [apiKey, setApiKeyState] = useState('')
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false)
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [selectedVersionId, setSelectedVersionId] = useState(null)
-  const [selectedSection, setSelectedSection] = useState('requirements')
+  const [selectedSection, setSelectedSection] = useState('overview')
   const [showPreferences, setShowPreferences] = useState(false)
   const [reviewState, setReviewState] = useState(null)
+  const [repoAnalysisState, setRepoAnalysisState] = useState(null)
   // reviewState: null | { status: 'loading' } | { status: 'result', data } | { status: 'error', message }
   const reviewAbortRef = useRef(null) // AbortController for in-flight review requests
 
@@ -49,20 +60,28 @@ export default function App() {
     }
   }, [prefs.theme])
 
-  // Load API key from secure storage on mount; migrate legacy key from prefs if present
+  // Load API key status on mount. Electron never returns the key to the renderer.
   useEffect(() => {
-    getApiKey().then((key) => {
-      if (key) {
-        setApiKeyState(key)
-      } else {
-        // Migration: key was previously stored in prefs.apiConfig.key (plain localStorage)
-        const legacyKey = loadPrefs().apiConfig?.key?.trim()
-        if (legacyKey) {
-          setApiKey(legacyKey).then(() => setApiKeyState(legacyKey))
-          // savePrefs will strip the key going forward, so just trigger a re-save
-          setPrefs((p) => ({ ...p }))
+    const legacyKey = prefs.apiConfig?.key?.trim()
+    loadApiKeyState().then(async ({ configured, key }) => {
+      let nextConfigured = configured
+      let nextKey = key
+
+      if (!nextConfigured && legacyKey) {
+        try {
+          nextConfigured = await setApiKey(legacyKey)
+          nextKey = legacyKey
+          setPrefs((prev) => {
+            const { key: _legacyKey, ...apiConfig } = prev.apiConfig || {}
+            return { ...prev, apiConfig }
+          })
+        } catch {
+          nextConfigured = false
         }
       }
+
+      setApiKeyConfigured(nextConfigured)
+      if (nextKey && !canRunReviewInMainProcess()) setApiKeyState(nextKey)
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -86,7 +105,11 @@ export default function App() {
       reviewAbortRef.current = null
     }
     setReviewState(null)
-  }, [selectedSection, selectedVersionId, showPreferences])
+  }, [selectedSection, selectedProjectId, selectedVersionId, showPreferences, currentProject?.guided, currentProject?.interviewContext])
+
+  useEffect(() => {
+    setRepoAnalysisState(null)
+  }, [selectedProjectId, selectedVersionId])
 
   const handleReview = useCallback(async () => {
     if (!currentVersion || !selectedSection) return
@@ -99,19 +122,61 @@ export default function App() {
     setReviewState({ status: 'loading' })
 
     const apiConfig = prefs.apiConfig || {}
+    // raidLog and learningsProof both live in failuresLearnings data
+    const SECTION_DATA_MAP = { raidLog: 'raidAndLearnings', learningsProof: 'raidAndLearnings' }
+    const dataSectionId = SECTION_DATA_MAP[selectedSection] || selectedSection
     try {
       const result = await callReview({
         apiKey,
         model: apiConfig.model,
         provider: apiConfig.provider || 'openai',
         sectionId: selectedSection,
-        sectionData: currentVersion[selectedSection],
+        sectionData: currentVersion[dataSectionId],
         customSections: prefs.customSections || [],
+        guided: currentProject?.guided === true,
+        interviewContext: currentProject?.guided ? currentProject.interviewContext : '',
         signal: controller.signal,
       })
       // Only update if this request wasn't cancelled
       if (!controller.signal.aborted) {
         setReviewState({ status: 'result', data: result })
+        const sectionLabel = resolveSectionLabel(selectedSection, prefs.customSections || [])
+        setStore((prev) => {
+          if (!selectedProjectId || !selectedVersionId) return prev
+          const project = prev.projects[selectedProjectId]
+          const version = project?.versions[selectedVersionId]
+          if (!project || !version) return prev
+          return {
+            ...prev,
+            projects: {
+              ...prev.projects,
+              [selectedProjectId]: {
+                ...project,
+                versions: {
+                  ...project.versions,
+                  [selectedVersionId]: {
+                    ...version,
+                    repoAnalysis: {
+                      ...(version.repoAnalysis || {}),
+                      archieScores: {
+                        ...(version.repoAnalysis?.archieScores || {}),
+                        [selectedSection]: {
+                          sectionId: selectedSection,
+                          sectionLabel,
+                          level: result.level,
+                          score: result.score,
+                          summary: result.summary,
+                          mode: currentProject?.guided ? 'guided' : 'standard',
+                          reviewedAt: new Date().toISOString(),
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          }
+        })
       }
     } catch (err) {
       if (err.name === 'AbortError') return // Silently ignore cancellations
@@ -119,19 +184,20 @@ export default function App() {
         setReviewState({ status: 'error', message: err.message || 'Review failed.' })
       }
     }
-  }, [currentVersion, selectedSection, prefs, apiKey])
+  }, [currentProject, currentVersion, selectedSection, prefs, apiKey, selectedProjectId, selectedVersionId])
 
   // Effective templates: user overrides take precedence over defaults
   const effectiveTemplates = { ...SECTION_TEMPLATES, ...prefs.templates }
 
   // Build dynamic sections list (base + custom)
   const customSections = prefs.customSections || []
-  const isApiConfigured = !!apiKey.trim()
+  const isApiConfigured = apiKeyConfigured
+  const numberedSectionCount = BASE_SECTIONS.filter((section) => section.id !== 'overview').length
   const sections = [
     ...BASE_SECTIONS,
     ...customSections.map((s, i) => ({
       id: s.id,
-      label: `${BASE_SECTIONS.length + i + 1}. ${s.label}`,
+      label: `${numberedSectionCount + i + 1}. ${s.label}`,
       short: s.label,
     })),
   ]
@@ -231,6 +297,120 @@ export default function App() {
     [selectedProjectId, selectedVersionId]
   )
 
+  const updateCurrentVersion = useCallback(
+    (updater) => {
+      if (!selectedProjectId || !selectedVersionId) return
+      setStore((prev) => {
+        const project = prev.projects[selectedProjectId]
+        const version = project?.versions[selectedVersionId]
+        if (!project || !version) return prev
+        const nextVersion = typeof updater === 'function' ? updater(version) : { ...version, ...updater }
+        return {
+          ...prev,
+          projects: {
+            ...prev.projects,
+            [selectedProjectId]: {
+              ...project,
+              versions: {
+                ...project.versions,
+                [selectedVersionId]: nextVersion,
+              },
+            },
+          },
+        }
+      })
+    },
+    [selectedProjectId, selectedVersionId]
+  )
+
+  const handleChooseRepository = useCallback(async () => {
+    try {
+      const source = await chooseRepositoryDirectory()
+      if (source) setRepoAnalysisState({ status: 'idle', source })
+      return source
+    } catch (err) {
+      setRepoAnalysisState({ status: 'error', message: err.message || 'Could not choose repository.' })
+      return null
+    }
+  }, [])
+
+  const handleAnalyzeRepository = useCallback(
+    async (source, analysisOptions = {}) => {
+      if (!source || !currentVersion) return
+      const apiConfig = prefs.apiConfig || {}
+      const normalizedSource =
+        source.type === 'remote'
+          ? { type: 'remote', url: source.url }
+          : { type: 'local', path: source.path, displayName: source.displayName }
+
+      setRepoAnalysisState({
+        status: 'loading',
+        source: normalizedSource,
+        message: 'Indexing repository and generating section drafts...',
+      })
+
+      try {
+        const draft = await analyzeRepository({
+          source: normalizedSource,
+          provider: apiConfig.provider || 'openai',
+          model: apiConfig.model,
+          options: analysisOptions,
+        })
+        const sourceFromDraft = draft.metadata?.source || normalizedSource
+        updateCurrentVersion((version) => {
+          const withReference = upsertRepositoryReference(version, draft)
+          return {
+            ...withReference,
+            repoAnalysis: {
+              ...(withReference.repoAnalysis || {}),
+              source: sourceFromDraft,
+              draft,
+              lastRun: {
+                id: draft.id,
+                createdAt: draft.createdAt,
+                commitSha: draft.metadata?.commitSha,
+                branch: draft.metadata?.branch,
+                selectedFileCount: draft.metadata?.selectedFileCount,
+                fileCount: draft.metadata?.fileCount,
+                options: analysisOptions,
+              },
+            },
+          }
+        })
+        setRepoAnalysisState({
+          status: 'result',
+          source: sourceFromDraft,
+          message: 'Repository draft generated.',
+        })
+      } catch (err) {
+        setRepoAnalysisState({
+          status: 'error',
+          source: normalizedSource,
+          message: err.message || 'Repository analysis failed.',
+        })
+      }
+    },
+    [currentVersion, prefs.apiConfig, updateCurrentVersion]
+  )
+
+  const handleApplyRepositoryDraft = useCallback(
+    (sectionIds) => {
+      const draft = currentVersion?.repoAnalysis?.draft
+      if (!currentVersion || !draft || !sectionIds?.length) return
+
+      const overwrites = sectionIds.filter((sectionId) => hasExistingSectionContent(currentVersion, sectionId))
+      if (
+        overwrites.length > 0 &&
+        !window.confirm('Apply generated content and replace existing content in the selected section(s)?')
+      ) {
+        return
+      }
+
+      updateCurrentVersion((version) => applyRepositoryDraft(version, draft, sectionIds))
+    },
+    [currentVersion, updateCurrentVersion]
+  )
+
   const handleExportVersion = async (projectId, versionId) => {
     const project = store.projects[projectId]
     const version = project?.versions[versionId]
@@ -249,7 +429,7 @@ export default function App() {
     if (!currentVersion) {
       return (
         <div className="empty-state" role="status">
-          <div className="empty-icon" aria-hidden="true">🍬</div>
+          <img className="empty-icon" src="./favicon.svg" width="80" height="80" alt="" />
           <h2>Select a project and version to get started</h2>
           <p>Create a project in the sidebar, then add a version (e.g. v1) to begin building your architecture template.</p>
         </div>
@@ -257,6 +437,22 @@ export default function App() {
     }
 
     switch (selectedSection) {
+      case 'overview':
+        return (
+          <Overview
+            project={currentProject}
+            onProjectChange={(changes) => setStore((prev) => ({
+              ...prev,
+              projects: { ...prev.projects, [selectedProjectId]: { ...prev.projects[selectedProjectId], ...changes } },
+            }))}
+            version={currentVersion}
+            isApiConfigured={isApiConfigured}
+            analysisState={repoAnalysisState}
+            onChooseLocalRepository={handleChooseRepository}
+            onAnalyzeRepository={handleAnalyzeRepository}
+            onApplyDraft={handleApplyRepositoryDraft}
+          />
+        )
       case 'requirements':
         return (
           <MarkdownSection
@@ -271,7 +467,7 @@ export default function App() {
       case 'architecture':
         return (
           <MarkdownSection
-            title="Architecture"
+            title="System Design"
             sectionType="architecture"
             data={currentVersion.architecture}
             template={effectiveTemplates.architecture}
@@ -279,10 +475,17 @@ export default function App() {
             onChange={(data) => updateSection('architecture', data)}
           />
         )
+      case 'decisions':
+        return (
+          <Decisions
+            data={currentVersion.decisions}
+            onChange={(data) => updateSection('decisions', data)}
+          />
+        )
       case 'scalingCost':
         return (
           <MarkdownSection
-            title="Scaling & Cost"
+            title="Scaling & Economics"
             sectionType="scalingCost"
             data={currentVersion.scalingCost}
             template={effectiveTemplates.scalingCost}
@@ -300,7 +503,7 @@ export default function App() {
       case 'codeStructure':
         return (
           <MarkdownSection
-            title="Code Structure"
+            title="Implementation Structure"
             sectionType="codeStructure"
             data={currentVersion.codeStructure}
             template={effectiveTemplates.codeStructure}
@@ -308,11 +511,18 @@ export default function App() {
             onChange={(data) => updateSection('codeStructure', data)}
           />
         )
-      case 'failuresLearnings':
+      case 'raidLog':
         return (
-          <FailuresLearnings
-            data={currentVersion.failuresLearnings}
-            onChange={(data) => updateSection('failuresLearnings', data)}
+          <RaidLog
+            data={currentVersion.raidAndLearnings}
+            onChange={(data) => updateSection('raidAndLearnings', data)}
+          />
+        )
+      case 'learningsProof':
+        return (
+          <LearningsProof
+            data={currentVersion.raidAndLearnings}
+            onChange={(data) => updateSection('raidAndLearnings', data)}
           />
         )
       case 'links':
@@ -356,7 +566,7 @@ export default function App() {
         onSelectVersion={(projectId, versionId) => {
           setSelectedProjectId(projectId)
           setSelectedVersionId(versionId)
-          setSelectedSection('requirements')
+          setSelectedSection('overview')
           setShowPreferences(false)
         }}
         onCreateProject={handleCreateProject}
@@ -373,10 +583,16 @@ export default function App() {
           <Preferences
               prefs={prefs}
               onChange={handlePrefsChange}
-              apiKey={apiKey}
-              onKeyChange={(key) => {
-                setApiKeyState(key)
-                setApiKey(key)
+              isApiKeyConfigured={apiKeyConfigured}
+              onKeySave={async (key) => {
+                const configured = await setApiKey(key)
+                setApiKeyState(canRunReviewInMainProcess() ? '' : key)
+                setApiKeyConfigured(configured)
+              }}
+              onKeyClear={async () => {
+                await clearApiKey()
+                setApiKeyState('')
+                setApiKeyConfigured(false)
               }}
             />
         ) : (
@@ -387,16 +603,26 @@ export default function App() {
               onChange={setSelectedSection}
               disabled={!currentVersion}
             />
-            <div className="section-content" id="main-content">{renderSection()}</div>
-            {currentVersion && (
+            <div className="section-content" id="main-content">
+              {currentVersion && currentProject?.guided && selectedSection !== 'overview' && (
+                <GuidedPrompt sectionId={selectedSection} onNext={() => {
+                  const index = sections.findIndex((section) => section.id === selectedSection)
+                  setSelectedSection(sections[index + 1]?.id || 'overview')
+                }} />
+              )}
+              {renderSection()}
+            </div>
+            {currentVersion && selectedSection !== 'overview' && (
               <ReviewButton
+                guided={currentProject?.guided === true}
                 onClick={handleReview}
                 isLoading={reviewState?.status === 'loading'}
                 isConfigured={isApiConfigured}
               />
             )}
-            {reviewState && currentVersion && (
+            {reviewState && currentVersion && selectedSection !== 'overview' && (
               <ReviewPanel
+                guided={currentProject?.guided === true}
                 state={reviewState}
                 sectionLabel={resolveSectionLabel(selectedSection, customSections)}
                 onClose={() => setReviewState(null)}

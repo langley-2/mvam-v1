@@ -6,39 +6,88 @@
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/third-party-notices.mjs",
     "preview": "vite preview",
     "electron:dev": "concurrently -k -n vite,electron \"vite\" \"wait-on http://localhost:5173 && VITE_DEV_SERVER_URL=http://localhost:5173 electron electron/main.cjs\"",
-    "package": "vite build && electron-builder --mac --dir",
-    "package:dmg": "vite build && electron-builder --mac"
-  },
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "marked": "^11.1.1"
+    "package": "npm run build && npm run icons && electron-builder --dir --publish never",
+    "package:dmg": "npm run build && npm run icons && electron-builder --mac dmg --publish never",
+    "test": "node --test",
+    "icons": "node scripts/generate-icons.mjs",
+    "check:secrets": "node scripts/check-secrets.mjs --history",
+    "check:release": "node scripts/check-release.mjs",
+    "package:win": "npm run build && npm run icons && electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "^4.2.1",
+    "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^8.2.2",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "vite": "^5.0.8",
-    "wait-on": "^7.2.0"
+    "electron": "^42.2.0",
+    "electron-builder": "^26.8.1",
+    "sharp": "^0.35.4",
+    "vite": "^8.0.13",
+    "wait-on": "^7.2.0",
+    "dompurify": "^3.4.5",
+    "marked": "^18.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "build": {
     "appId": "com.taffy.app",
     "productName": "Taffy",
     "files": [
-      "dist/**/*",
-      "electron/**/*"
+      "dist/index.html",
+      "dist/assets/*.js",
+      "dist/assets/*.css",
+      "dist/favicon.svg",
+      "dist/THIRD_PARTY_NOTICES.txt",
+      "electron/main.cjs",
+      "electron/preload.cjs",
+      "electron/review.cjs",
+      "electron/review.mjs",
+      "electron/repositoryAnalysis.cjs",
+      "!node_modules/**/*"
     ],
     "mac": {
       "category": "public.app-category.productivity",
-      "target": "dir",
-      "identity": null
+      "target": "dmg",
+      "identity": "-",
+      "icon": "build/icon.icns",
+      "artifactName": "Taffy-${arch}.${ext}"
     },
     "directories": {
       "output": "release"
+    },
+    "asar": true,
+    "afterPack": "scripts/after-pack.cjs",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Taffy-Setup-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
     }
+  },
+  "description": "Taffy \u2014 architecture notes and guided interview practice",
+  "author": "Taffy contributors",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.12.0"
   }
 }

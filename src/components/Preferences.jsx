@@ -1,18 +1,18 @@
 import { useState, useRef } from 'react'
-import { marked } from 'marked'
 import { SECTION_TEMPLATES } from '../templates'
 import { generateId } from '../storage'
 import { PROVIDERS } from '../api/review'
+import { renderMarkdown } from '../markdown'
 
 const BUILT_IN_SECTIONS = [
   { id: 'requirements', label: 'Requirements' },
-  { id: 'architecture', label: 'Architecture' },
-  { id: 'scalingCost', label: 'Scaling & Cost' },
-  { id: 'codeStructure', label: 'Code Structure' },
-  { id: 'failuresLearnings', label: 'Failures & Learnings' },
+  { id: 'architecture', label: 'System Design' },
+  { id: 'scalingCost', label: 'Scaling & Economics' },
+  { id: 'codeStructure', label: 'Implementation Structure' },
+  { id: 'learningsProof', label: 'Learnings & Proof' },
 ]
 
-export default function Preferences({ prefs, onChange, apiKey, onKeyChange }) {
+export default function Preferences({ prefs, onChange, isApiKeyConfigured, onKeySave, onKeyClear }) {
   const [activeId, setActiveId] = useState('requirements')
   const [mode, setMode] = useState('edit')
   const [newSectionName, setNewSectionName] = useState('')
@@ -199,8 +199,8 @@ export default function Preferences({ prefs, onChange, apiKey, onKeyChange }) {
               onClick={() => setActiveId('__api__')}
               aria-current={isApi ? 'page' : undefined}
             >
-              AI Review API
-              {prefs.apiConfig?.key && (
+              AI Provider
+              {isApiKeyConfigured && (
                 <span className="prefs-custom-badge" aria-label="configured">
                   on
                 </span>
@@ -214,7 +214,13 @@ export default function Preferences({ prefs, onChange, apiKey, onKeyChange }) {
         {isAppearance ? (
           <AppearancePanel prefs={prefs} onChange={onChange} />
         ) : isApi ? (
-          <ApiPanel prefs={prefs} onChange={onChange} apiKey={apiKey} onKeyChange={onKeyChange} />
+          <ApiPanel
+            prefs={prefs}
+            onChange={onChange}
+            isApiKeyConfigured={isApiKeyConfigured}
+            onKeySave={onKeySave}
+            onKeyClear={onKeyClear}
+          />
         ) : (
           <>
             <div className="prefs-header">
@@ -272,7 +278,7 @@ export default function Preferences({ prefs, onChange, apiKey, onKeyChange }) {
                 {mode === 'preview' && (
                   <div
                     className="md-preview"
-                    dangerouslySetInnerHTML={{ __html: marked.parse(currentTemplate) }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(currentTemplate) }}
                     aria-label={`${activeLabel} template preview`}
                   />
                 )}
@@ -294,20 +300,20 @@ function AppearancePanel({ prefs, onChange }) {
     {
       value: 'light',
       label: 'Light',
-      desc: 'Blush white background',
-      preview: { bg: '#fdf4f8', sidebar: '#1c1020', accent: '#e8508a' },
+      desc: 'Cloud white & soft blue',
+      preview: { bg: '#f3f8fc', sidebar: '#10283f', accent: '#2476c7' },
     },
     {
       value: 'dark',
       label: 'Dark',
-      desc: 'Deep burgundy dark',
-      preview: { bg: '#1a0e16', sidebar: '#0f080d', accent: '#f06898' },
+      desc: 'Midnight navy & blue',
+      preview: { bg: '#11283e', sidebar: '#10283f', accent: '#7cc6fa' },
     },
     {
       value: 'system',
       label: 'System',
       desc: 'Follow OS preference',
-      preview: { bg: 'linear-gradient(135deg, #fdf4f8 50%, #1a0e16 50%)', sidebar: '#1c1020', accent: '#e8508a' },
+      preview: { bg: 'linear-gradient(135deg, #f3f8fc 50%, #11283e 50%)', sidebar: '#10283f', accent: '#2476c7' },
     },
   ]
 
@@ -358,12 +364,42 @@ function AppearancePanel({ prefs, onChange }) {
 
 // ─── API panel ────────────────────────────────────────────────────────────────
 
-function ApiPanel({ prefs, onChange, apiKey, onKeyChange }) {
+function ApiPanel({ prefs, onChange, isApiKeyConfigured, onKeySave, onKeyClear }) {
   const config = prefs.apiConfig || { provider: 'openai', model: 'gpt-4o-mini' }
   const [showKey, setShowKey] = useState(false)
+  const [draftKey, setDraftKey] = useState('')
+  const [status, setStatus] = useState('')
+  const [error, setError] = useState('')
 
   const update = (updates) => {
     onChange({ ...prefs, apiConfig: { ...config, ...updates } })
+  }
+
+  const handleSaveKey = async () => {
+    if (!draftKey.trim()) return
+    setStatus('')
+    setError('')
+    try {
+      await onKeySave(draftKey.trim())
+      setDraftKey('')
+      setShowKey(false)
+      setStatus('API key saved.')
+    } catch (err) {
+      setError(err.message || 'Failed to save API key.')
+    }
+  }
+
+  const handleClearKey = async () => {
+    setStatus('')
+    setError('')
+    try {
+      await onKeyClear()
+      setDraftKey('')
+      setShowKey(false)
+      setStatus('API key removed.')
+    } catch (err) {
+      setError(err.message || 'Failed to remove API key.')
+    }
   }
 
 
@@ -371,25 +407,25 @@ function ApiPanel({ prefs, onChange, apiKey, onKeyChange }) {
     <div>
       <div className="prefs-header">
         <div>
-          <h2 className="prefs-title">AI Review API</h2>
+          <h2 className="prefs-title">AI Provider</h2>
           <p className="prefs-desc">
-            Connect Taffy to an AI provider to enable per-section architecture reviews.
+            Connect Taffy to an AI provider to enable section reviews and static repository analysis.
           </p>
         </div>
       </div>
 
       <div className="api-security-notice" role="note" aria-label="Security information">
-        <strong>Security:</strong> Your API key is encrypted and stored on this device only using
-        your operating system's secure storage. It is never included in project exports, never sent
-        anywhere except your chosen AI provider, and is never accessible to other users.
+        <strong>Security:</strong> In the desktop app, your API key is encrypted with the operating
+        system's secure storage and provider requests run outside the renderer. Browser development
+        mode keeps the key in memory only; reload the page to clear it.
       </div>
 
       <div className="ai-disclosure" role="note" aria-label="AI service disclosure">
-        <strong>Third-party AI services.</strong> When you request a review, your section content
-        (text and any uploaded images) is sent to the AI provider you have selected. These services
-        are operated by third parties — Taffy has no control over how they process or retain your
-        data. AI-generated reviews may be inaccurate, incomplete, or misleading. You are responsible
-        for reviewing all AI output before acting on it, and for ensuring any content you submit is
+        <strong>Third-party AI services.</strong> When you request a review or repository analysis,
+        relevant section or repository content is sent to the AI provider you have selected. These
+        services are operated by third parties — Taffy has no control over how they process or retain
+        your data. AI-generated output may be inaccurate, incomplete, or misleading. You are
+        responsible for reviewing it before acting on it, and for ensuring any content you submit is
         appropriate to share with your chosen provider.
       </div>
 
@@ -423,9 +459,13 @@ function ApiPanel({ prefs, onChange, apiKey, onKeyChange }) {
               id="api-key"
               type={showKey ? 'text' : 'password'}
               className="api-key-input"
-              value={apiKey || ''}
-              onChange={(e) => onKeyChange(e.target.value)}
-              placeholder="sk-…"
+              value={draftKey}
+              onChange={(e) => {
+                setDraftKey(e.target.value)
+                setStatus('')
+                setError('')
+              }}
+              placeholder={isApiKeyConfigured ? 'Enter a new key to replace the saved key' : 'sk-…'}
               autoComplete="new-password"
               autoCorrect="off"
               spellCheck={false}
@@ -441,23 +481,35 @@ function ApiPanel({ prefs, onChange, apiKey, onKeyChange }) {
             </button>
           </div>
           <p className="api-field-hint" id="api-key-hint">
-            Stored locally on this device only. Never shared or exported.
+            {isApiKeyConfigured
+              ? 'A key is saved. The saved value is not shown here.'
+              : 'No API key is saved yet.'}
           </p>
         </div>
 
-        {/* Clear key */}
-        {apiKey && (
+        <button
+          className="btn-secondary"
+          onClick={handleSaveKey}
+          disabled={!draftKey.trim()}
+        >
+          Save API key
+        </button>
+
+        {isApiKeyConfigured && (
           <button
             className="btn-danger-sm"
             onClick={() => {
               if (window.confirm('Remove your API key?')) {
-                onKeyChange('')
+                handleClearKey()
               }
             }}
           >
             Remove API key
           </button>
         )}
+
+        {status && <p className="api-field-hint" role="status">{status}</p>}
+        {error && <p className="api-field-hint" role="alert">{error}</p>}
       </div>
     </div>
   )

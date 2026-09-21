@@ -16,13 +16,7 @@ export const SECTION_TEMPLATES = {
 - Operability:
 `,
 
-  architecture: `# Architecture
-
-## Core Decisions
-- **Decision**: [What you chose]
-  - Constraint: [Why]
-  - Alternatives: [What you didn't choose]
-  - Tradeoff: [What you gave up]
+  architecture: `# System Design
 
 ## System Traits
 - Architecture type:
@@ -34,11 +28,28 @@ export const SECTION_TEMPLATES = {
 - Resilience posture:
 - Security posture:
 
+## Failure Modes & Resilience
+
+### Critical Failure Modes
+| Component | Failure Mode | Impact | Mitigation |
+|-----------|-------------|--------|------------|
+|           |             |        |            |
+
+### Degradation Strategy
+- Full outage response:
+- Partial degradation — what stays up:
+- Dependency failure fallback:
+
+### Recovery Targets
+- RTO (Recovery Time Objective):
+- RPO (Recovery Point Objective):
+- MTTR target:
+
 ## Known Tradeoffs / Deferred Decisions
 -
 `,
 
-  scalingCost: `# Scaling & Cost Profile
+  scalingCost: `# Scaling & Economics
 
 ## Current State
 - Load: [users, requests, data volume]
@@ -59,7 +70,7 @@ export const SECTION_TEMPLATES = {
 |           |     |      |       |
 `,
 
-  codeStructure: `# Code Structure
+  codeStructure: `# Implementation Structure
 
 ## Overview
 [2–3 sentences]
@@ -74,7 +85,7 @@ export const SECTION_TEMPLATES = {
   - Key folders:
 `,
 
-  failuresLearnings: `# Failures & Learnings Log
+  learningsProof: `# Learnings & Proof
 
 ## [Date] | [Title]
 - What happened:
@@ -129,7 +140,6 @@ export const FORM_DEFAULTS = {
     operability: '',
   },
   architecture: {
-    decisions: [{ decision: '', constraint: '', alternatives: '', tradeoff: '' }],
     archType: '',
     dataArch: '',
     stateManagement: '',
@@ -138,6 +148,11 @@ export const FORM_DEFAULTS = {
     scalingAxis: '',
     resilience: '',
     securityPosture: '',
+    failureModes: [{ component: '', mode: '', impact: '', mitigation: '' }],
+    degradationStrategy: '',
+    recoveryRTO: '',
+    recoveryRPO: '',
+    recoveryMTTR: '',
     deferred: [''],
   },
   scalingCost: {
@@ -156,7 +171,7 @@ export const FORM_DEFAULTS = {
     overview: '',
     layers: [{ name: '', purpose: '', keyFolders: '' }],
   },
-  failuresLearnings: {
+  learningsProof: {
     entries: [{ date: '', title: '', whatHappened: '', rootCause: '', impact: '', patternLearned: '', prevention: '' }],
   },
 }
@@ -169,7 +184,7 @@ export function buildMarkdownFromForm(sectionType, form) {
     case 'architecture': return buildArchitecture(form)
     case 'scalingCost': return buildScalingCost(form)
     case 'codeStructure': return buildCodeStructure(form)
-    case 'failuresLearnings': return buildFailuresLearnings(form)
+    case 'learningsProof': return buildLearningsProof(form)
     default: return ''
   }
 }
@@ -196,14 +211,6 @@ function buildRequirements(form) {
 }
 
 function buildArchitecture(form) {
-  const decisions = form.decisions || []
-  const decisionBlock = decisions
-    .map(
-      (d) =>
-        `- **Decision**: ${d.decision || ''}\n  - Constraint: ${d.constraint || ''}\n  - Alternatives: ${d.alternatives || ''}\n  - Tradeoff: ${d.tradeoff || ''}`
-    )
-    .join('\n\n') || '- **Decision**: \n  - Constraint: \n  - Alternatives: \n  - Tradeoff: '
-
   const traits = [
     ['Architecture type', form.archType],
     ['Data architecture & consistency', form.dataArch],
@@ -216,6 +223,23 @@ function buildArchitecture(form) {
   ]
   const traitsBlock = traits.map(([label, val]) => `- ${label}: ${val || ''}`).join('\n')
 
+  const failureModes = form.failureModes || []
+  const fmRows = failureModes
+    .map((r) => `| ${r.component || ''} | ${r.mode || ''} | ${r.impact || ''} | ${r.mitigation || ''} |`)
+    .join('\n') || '|           |             |        |            |'
+
+  const degradation = [
+    `- Full outage response: ${form.degradationStrategy || ''}`,
+    `- Partial degradation — what stays up:`,
+    `- Dependency failure fallback:`,
+  ].join('\n')
+
+  const recovery = [
+    `- RTO (Recovery Time Objective): ${form.recoveryRTO || ''}`,
+    `- RPO (Recovery Point Objective): ${form.recoveryRPO || ''}`,
+    `- MTTR target: ${form.recoveryMTTR || ''}`,
+  ].join('\n')
+
   const deferred = form.deferred || ['']
   const deferredLines =
     deferred
@@ -223,7 +247,7 @@ function buildArchitecture(form) {
       .map((d) => `- ${d}`)
       .join('\n') || '-'
 
-  return `# Architecture\n\n## Core Decisions\n${decisionBlock}\n\n## System Traits\n${traitsBlock}\n\n## Known Tradeoffs / Deferred Decisions\n${deferredLines}\n`
+  return `# System Design\n\n## System Traits\n${traitsBlock}\n\n## Failure Modes & Resilience\n\n### Critical Failure Modes\n| Component | Failure Mode | Impact | Mitigation |\n|-----------|-------------|--------|------------|\n${fmRows}\n\n### Degradation Strategy\n${degradation}\n\n### Recovery Targets\n${recovery}\n\n## Known Tradeoffs / Deferred Decisions\n${deferredLines}\n`
 }
 
 function buildScalingCost(form) {
@@ -232,7 +256,7 @@ function buildScalingCost(form) {
       .map((row) => `| ${row.component || ''} | ${row.tenX || ''} | ${row.hundredX || ''} | ${row.thousandX || ''} |`)
       .join('\n') || '|           |     |      |       |'
 
-  return `# Scaling & Cost Profile\n\n## Current State\n- Load: ${form.load || ''}\n- Infrastructure: ${form.infrastructure || ''}\n- Monthly cost: ${form.monthlyCost || ''}\n- Cost per unit: ${form.costPerUnit || ''}\n\n## Primary Scaling Axis\n${form.scalingAxis || ''}\n\n## Bottlenecks & Mitigation\n- 10x: ${form.breaks10x || '[what breaks]'} → ${form.fix10x || '[fix]'}\n- 100x: ${form.breaks100x || '[what breaks]'} → ${form.fix100x || '[fix]'}\n\n## Unit Economics & ROI (if applicable)\n| Component | 10x | 100x | 1000x |\n|-----------|-----|------|-------|\n${unitRows}\n`
+  return `# Scaling & Economics\n\n## Current State\n- Load: ${form.load || ''}\n- Infrastructure: ${form.infrastructure || ''}\n- Monthly cost: ${form.monthlyCost || ''}\n- Cost per unit: ${form.costPerUnit || ''}\n\n## Primary Scaling Axis\n${form.scalingAxis || ''}\n\n## Bottlenecks & Mitigation\n- 10x: ${form.breaks10x || '[what breaks]'} → ${form.fix10x || '[fix]'}\n- 100x: ${form.breaks100x || '[what breaks]'} → ${form.fix100x || '[fix]'}\n\n## Unit Economics & ROI (if applicable)\n| Component | 10x | 100x | 1000x |\n|-----------|-----|------|-------|\n${unitRows}\n`
 }
 
 function buildCodeStructure(form) {
@@ -245,10 +269,10 @@ function buildCodeStructure(form) {
       )
       .join('\n\n') || '- Layer/Domain: \n  - Purpose: \n  - Key folders: '
 
-  return `# Code Structure\n\n## Overview\n${form.overview || ''}\n\n## High-Level Organization\n${layerBlock}\n`
+  return `# Implementation Structure\n\n## Overview\n${form.overview || ''}\n\n## High-Level Organization\n${layerBlock}\n`
 }
 
-function buildFailuresLearnings(form) {
+function buildLearningsProof(form) {
   const entries = form.entries || []
   const entriesBlock =
     entries
@@ -259,5 +283,5 @@ function buildFailuresLearnings(form) {
       .join('\n\n') ||
     '## [Date] | [Title]\n- What happened:\n- Root cause:\n- Impact:\n- Pattern learned:\n- Prevention / Fix:'
 
-  return `# Failures & Learnings Log\n\n${entriesBlock}\n`
+  return `# Learnings & Proof\n\n${entriesBlock}\n`
 }

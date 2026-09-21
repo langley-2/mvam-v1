@@ -92,7 +92,7 @@ export default function Sidebar({
   return (
     <aside className="sidebar" aria-label="Projects sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-logo">🍬</span>
+        <img className="sidebar-logo" src="./favicon.svg" alt="" />
         <span className="sidebar-title">Taffy</span>
       </div>
 

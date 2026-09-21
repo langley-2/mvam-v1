@@ -7,7 +7,28 @@ const LEVEL_DESCRIPTIONS = {
   Staff: 'Decision-making artefact: precise, complete, onboards teams or survives postmortems.',
 }
 
-export default function ReviewPanel({ state, sectionLabel, onClose }) {
+function ArchieAvatar({ size = 32 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 32 32"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="archie-avatar"
+      aria-hidden="true"
+    >
+      <circle cx="16" cy="16" r="16" fill="var(--accent)" />
+      {/* 4-pointed sparkle — matches the ✦ on the FAB button */}
+      <path
+        d="M16 6 L17.6 14.4 L26 16 L17.6 17.6 L16 26 L14.4 17.6 L6 16 L14.4 14.4 Z"
+        fill="white"
+      />
+    </svg>
+  )
+}
+
+export default function ReviewPanel({ state, sectionLabel, onClose, guided }) {
   const panelRef = useRef(null)
   const closeButtonRef = useRef(null)
 
@@ -39,18 +60,21 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
         className="review-panel"
         role="dialog"
         aria-modal="true"
-        aria-label={`AI review: ${sectionLabel}`}
+        aria-label={`Archie's feedback: ${sectionLabel}`}
       >
         <div className="review-panel-header">
-          <div>
-            <h2 className="review-panel-title">AI Review</h2>
-            <span className="review-panel-section">{sectionLabel}</span>
+          <div className="review-panel-header-identity">
+            <ArchieAvatar size={32} />
+            <div>
+              <h2 className="review-panel-title">{guided ? 'Archie · interview coach' : 'Archie'}</h2>
+              <span className="review-panel-section">{sectionLabel}</span>
+            </div>
           </div>
           <button
             ref={closeButtonRef}
             className="review-panel-close"
             onClick={onClose}
-            aria-label="Close review panel"
+            aria-label="Close Archie's feedback"
           >
             ×
           </button>
@@ -58,9 +82,9 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
 
         <div className="review-panel-body">
           {state.status === 'loading' && (
-            <div className="review-loading" role="status" aria-live="polite" aria-label="Reviewing…">
+            <div className="review-loading" role="status" aria-live="polite" aria-label="Archie is taking a look…">
               <div className="review-spinner" aria-hidden="true" />
-              <p>Reviewing your {sectionLabel} section…</p>
+              <p>Archie is taking a look at your {sectionLabel}…</p>
             </div>
           )}
 
@@ -84,7 +108,7 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
                   >
                     {state.data.level}
                   </span>
-                  {LEVEL_DESCRIPTIONS[state.data.level] && (
+                  {!guided && LEVEL_DESCRIPTIONS[state.data.level] && (
                     <p className="review-level-desc">{LEVEL_DESCRIPTIONS[state.data.level]}</p>
                   )}
                 </div>
@@ -96,7 +120,7 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
 
               {/* Summary */}
               <section className="review-section" aria-labelledby="review-summary-label">
-                <h3 className="review-section-title" id="review-summary-label">Summary</h3>
+                <h3 className="review-section-title" id="review-summary-label">Archie's take</h3>
                 {/* Plain text — no dangerouslySetInnerHTML, XSS-safe */}
                 <p className="review-summary-text">{state.data.summary}</p>
               </section>
@@ -104,7 +128,7 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
               {/* Improvements */}
               <section className="review-section" aria-labelledby="review-improvements-label">
                 <h3 className="review-section-title" id="review-improvements-label">
-                  Improvements ({state.data.improvements.length})
+                  Things to work on ({state.data.improvements.length})
                 </h3>
                 <ol className="review-improvements-list">
                   {state.data.improvements.map((improvement, i) => (
@@ -117,8 +141,8 @@ export default function ReviewPanel({ state, sectionLabel, onClose }) {
               </section>
 
               <p className="review-disclaimer">
-                AI reviews are a starting point, not a definitive assessment.
-                Verify suggestions against your specific context.
+                Archie is a helpful starting point, not the final word.
+                Use your own judgement for your specific context.
               </p>
             </div>
           )}
