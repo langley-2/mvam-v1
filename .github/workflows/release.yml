@@ -53,10 +53,10 @@ jobs:
       - name: Add SHA-256 checksums
         working-directory: artifacts
         run: sha256sum *.exe *.dmg > SHA256SUMS.txt
-      - name: Create draft release
+      - name: Publish pre-release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$TAG" artifacts/* --verify-tag --draft --title "Taffy $TAG" --notes "Preview build. Bring your own OpenAI API key. Windows and macOS builds are not publisher-signed; test installation and launch before publishing."
+          gh release create "$TAG" artifacts/* --verify-tag --prerelease --title "Taffy $TAG" --notes "Preview build for testing. Bring your own OpenAI API key. Windows and macOS builds are not publisher-signed, so the operating system may show a security warning during installation."
