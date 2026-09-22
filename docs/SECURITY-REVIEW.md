@@ -25,7 +25,7 @@ Before pushing, Gitleaks v8.30.1 (downloaded from its official release with the 
 | Raw provider and Git errors could reflect submitted secrets | Show bounded, generic errors rather than raw remote error bodies or Git stderr. Provider calls have timeouts. |
 | Repository path and transport risks | Resolve real paths to prevent parent-symlink escapes; reject credential-bearing/query-bearing remotes and unsafe transports; disable Git hooks/fsmonitor for app operations; bound stderr. |
 | Sensitive filenames could enter the provider’s file-tree evidence | Filter sensitive and ignored paths from the submitted tree as well as file contents. |
-| Broad packaging and obsolete release instructions | Explicit runtime allowlist, archive inspection hook, no runtime `node_modules`, bundled license notices, Windows NSIS target and draft-release workflow. |
+| Broad packaging and obsolete release instructions | Explicit runtime allowlist, archive inspection hook, no runtime `node_modules`, bundled license notices, Windows NSIS target and verified pre-release workflow. |
 | Electron runtime capabilities unnecessary for the app | Disable RunAsNode, NODE_OPTIONS and Node inspect flags; enable embedded archive-integrity validation and ASAR-only loading. Deny permission requests and webview attachment. |
 | Duplicate browser/desktop review implementations | Shared review module with tests for guided/standard context separation and safe result validation. |
 
@@ -33,16 +33,18 @@ Electron’s renderer sandbox, context isolation, disabled Node integration, res
 
 ## Verification
 
-- 13 automated tests cover guided review payloads, diagram evidence, standard-mode context exclusion, bounded context, provider schema/error safety, key-free IPC, transport validation, symlink escape prevention, evidence filtering, project persistence, memory-only browser keys and archive-gate rejection cases.
+- 14 automated tests cover guided review payloads, diagram evidence, standard-mode context exclusion, bounded context, provider schema/error safety, key-free IPC, transport validation, symlink escape prevention, evidence filtering, project persistence, memory-only browser keys and archive-gate rejection cases, including Windows archive paths.
 - Production Vite builds and Windows/macOS packaging completed with the archive gate enabled.
 - Browser UI checks exercised project/version creation, guided prompts, next-section navigation, reload persistence, retained job context, standard-mode switching without losing notes, and light/dark styling.
 - Provider calls in tests are mocked. No real API key or project content was submitted for QA, so live model quality and billing behavior still need a voluntary smoke test with sample data.
 - The final packaged Mac app launched and rendered successfully. Its ad-hoc signature passed `codesign --verify --deep --strict`; the Windows installer has no Authenticode certificate. Runtime fuses were read back from both packaged apps.
-- Windows installation and execution cannot be verified on this Mac. Complete the Windows smoke test in `RELEASE.md` before publishing.
+- Windows installation and execution cannot be verified on this Mac. Complete the Windows smoke test in `RELEASE.md` before promoting a preview to a stable release.
+
+The exact public `v1.0.2` EXE and DMG were downloaded again and matched their published SHA-256 checksums. Both embedded application archives passed the allowlist and credential scan with 11 files. No credential patterns, email addresses, environment/key files, local developer paths or application source maps were found. The DMG filesystem verified successfully and the extracted macOS application's ad-hoc signature passed deep strict verification. The full runtime string scan found no credential or local-path indicators; source-map marker strings belong to the bundled Electron runtime, while no map file is present in the application archive.
 
 ## Remaining release considerations
 
-The Windows preview installer has no publisher signature. The macOS preview uses an ad-hoc signature, not Developer ID signing/notarization. These are test builds, and normal operating-system trust prompts can remain. The release workflow deliberately creates drafts, not public releases.
+The Windows preview installer has no publisher signature. The macOS preview uses an ad-hoc signature, not Developer ID signing/notarization. These are test builds, and normal operating-system trust prompts can remain. Tagged builds are published as pre-releases until platform installation checks and signing are complete.
 
 Project documents, images and interview context remain unencrypted localStorage data; only the desktop API key is encrypted. Repository redaction cannot ensure that every private fact is removed. A requested AI review transmits the relevant content to OpenAI. Markdown can load remote image URLs while previewing. Desktop requests already started may continue until their timeout if the UI closes the feedback panel, although stale results are not applied after navigation.
 

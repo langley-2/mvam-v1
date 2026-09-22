@@ -2,6 +2,10 @@
 
 A local desktop workspace for architecture notes, diagrams, decisions and interview practice. Projects contain independent versions of nine architecture sections. Archie can review a section or draft notes from a repository using your own OpenAI API key.
 
+## Download
+
+Download the Windows x64 installer or Apple Silicon macOS disk image from the [current published preview, v1.0.2](https://github.com/langley-2/mvam-v1/releases/tag/v1.0.2). These preview builds are not publisher-signed, so the operating system may show a security warning.
+
 ## Develop
 
 Use Node.js 22.12+ (Node 22 LTS is pinned in `.nvmrc`) and npm.
@@ -52,6 +56,6 @@ The Windows build currently has no publisher certificate. The Mac build uses an 
 - `electron/repositoryAnalysis.cjs`: bounded repository evidence collection and drafting.
 - `scripts/`: deterministic icons, license notices and release checks.
 - `tests/`: review, privacy, persistence and archive-gate regression tests.
-- `.github/workflows/`: checks, native platform builds and draft GitHub Releases.
+- `.github/workflows/`: checks, native platform builds and preview GitHub Releases.
 
 The repository has no open-source license grant (`UNLICENSED`); choose a license separately if you want to publish the source for reuse.
