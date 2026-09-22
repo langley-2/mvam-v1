@@ -4,7 +4,14 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import os from 'node:os'
 import { createPackage } from '@electron/asar'
-import { inspectArchive } from '../scripts/check-release.mjs'
+import { archiveEntryNames, inspectArchive } from '../scripts/check-release.mjs'
+
+test('release gate preserves Windows archive paths while normalizing allowlist paths', () => {
+  assert.deepEqual(archiveEntryNames('\\dist\\assets\\index.css'), {
+    readName: 'dist\\assets\\index.css',
+    name: 'dist/assets/index.css'
+  })
+})
 
 test('release gate rejects bundled private files and likely credentials', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'taffy-archive-test-'))

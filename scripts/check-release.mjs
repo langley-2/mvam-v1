@@ -4,12 +4,20 @@ import { listPackage, statFile, extractFile } from '@electron/asar'
 import { findSecrets } from './security-patterns.mjs'
 
 const runtimeFiles = new Set(['main.cjs', 'preload.cjs', 'review.cjs', 'review.mjs', 'repositoryAnalysis.cjs'])
+
+export function archiveEntryNames(entry) {
+  const readName = entry.replace(/^[/\\]/, '')
+  return { readName, name: readName.replaceAll('\\', '/') }
+}
+
 export function inspectArchive(archive) {
   const failures = []
+  const archiveEntries = new Set()
   let count = 0
   for (const entry of listPackage(archive)) {
-    const name = entry.replace(/^[/\\]/, '').replaceAll('\\', '/')
-    const stat = statFile(archive, name)
+    const { readName, name } = archiveEntryNames(entry)
+    archiveEntries.add(name)
+    const stat = statFile(archive, readName)
     if (stat.files) continue
     count++
     const allowed = name === 'package.json' || name === 'dist/index.html' || name === 'dist/favicon.svg' ||
@@ -17,13 +25,13 @@ export function inspectArchive(archive) {
       (name.startsWith('electron/') && runtimeFiles.has(name.slice(9)))
     if (!allowed || stat.link || stat.unpacked) failures.push(`${name}: unexpected archive entry`)
     if (!stat.link) {
-      const content = extractFile(archive, name).toString('utf8')
+      const content = extractFile(archive, readName).toString('utf8')
       for (const kind of findSecrets(content)) failures.push(`${name}: possible ${kind}`)
       if (/\/Users\/[^/\s]+\/|[A-Z]:\\Users\\/.test(content)) failures.push(`${name}: developer home path`)
     }
   }
   for (const required of ['package.json', 'dist/index.html', ...[...runtimeFiles].map((f) => `electron/${f}`)]) {
-    try { statFile(archive, required) } catch { failures.push(`${required}: missing`) }
+    if (!archiveEntries.has(required)) failures.push(`${required}: missing`)
   }
   if (failures.length) throw new Error(failures.join('\n'))
   console.log(`Archive check passed: ${count} files, no unexpected files or credential-pattern matches.`)
