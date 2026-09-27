@@ -58,4 +58,4 @@ The Windows build currently has no publisher certificate. The Mac build uses an 
 - `tests/`: review, privacy, persistence and archive-gate regression tests.
 - `.github/workflows/`: checks, native platform builds and preview GitHub Releases.
 
-The repository has no open-source license grant (`UNLICENSED`); choose a license separately if you want to publish the source for reuse.
+Taffy is open-source software licensed under the [Apache License 2.0](LICENSE).

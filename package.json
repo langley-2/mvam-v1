@@ -39,6 +39,7 @@
       "dist/assets/*.css",
       "dist/favicon.svg",
       "dist/THIRD_PARTY_NOTICES.txt",
+      "LICENSE",
       "electron/main.cjs",
       "electron/preload.cjs",
       "electron/review.cjs",
@@ -86,7 +87,7 @@
   },
   "description": "Taffy \u2014 architecture notes and guided interview practice",
   "author": "Taffy contributors",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=22.12.0"
   }

@@ -20,7 +20,7 @@ export function inspectArchive(archive) {
     const stat = statFile(archive, readName)
     if (stat.files) continue
     count++
-    const allowed = name === 'package.json' || name === 'dist/index.html' || name === 'dist/favicon.svg' ||
+    const allowed = name === 'package.json' || name === 'LICENSE' || name === 'dist/index.html' || name === 'dist/favicon.svg' ||
       name === 'dist/THIRD_PARTY_NOTICES.txt' || /^dist\/assets\/[^/]+\.(js|css)$/.test(name) ||
       (name.startsWith('electron/') && runtimeFiles.has(name.slice(9)))
     if (!allowed || stat.link || stat.unpacked) failures.push(`${name}: unexpected archive entry`)
@@ -30,7 +30,7 @@ export function inspectArchive(archive) {
       if (/\/Users\/[^/\s]+\/|[A-Z]:\\Users\\/.test(content)) failures.push(`${name}: developer home path`)
     }
   }
-  for (const required of ['package.json', 'dist/index.html', ...[...runtimeFiles].map((f) => `electron/${f}`)]) {
+  for (const required of ['package.json', 'LICENSE', 'dist/index.html', ...[...runtimeFiles].map((f) => `electron/${f}`)]) {
     if (!archiveEntries.has(required)) failures.push(`${required}: missing`)
   }
   if (failures.length) throw new Error(failures.join('\n'))

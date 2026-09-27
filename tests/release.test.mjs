@@ -20,6 +20,7 @@ test('release gate rejects bundled private files and likely credentials', async 
     await fs.mkdir(path.join(source, 'dist'), { recursive: true })
     await fs.mkdir(path.join(source, 'electron'))
     await fs.writeFile(path.join(source, 'package.json'), '{}')
+    await fs.writeFile(path.join(source, 'LICENSE'), 'Apache License 2.0')
     await fs.writeFile(path.join(source, 'dist/index.html'), '<html></html>')
     for (const name of ['main.cjs','preload.cjs','review.cjs','review.mjs','repositoryAnalysis.cjs']) await fs.writeFile(path.join(source, 'electron', name), '// placeholder')
     const archive = path.join(root, 'safe.asar')
