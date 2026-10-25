@@ -59,3 +59,23 @@ The Windows build currently has no publisher certificate. The Mac build uses an 
 - `.github/workflows/`: checks, native platform builds and preview GitHub Releases.
 
 Taffy is open-source software licensed under the [Apache License 2.0](LICENSE).
+
+## Architecture walkthrough scenarios
+
+Pick a scenario, create a project and work through the architecture sections, using Archie to review your design and trade-offs.
+
+### Cloud architecture
+
+1. Pub/sub architecture for a message publishing system with multiple subscribers, retries and dead-letter queues.
+2. Scalable web application with a CDN, load balancer, stateless API and managed database.
+3. Event-driven e-commerce checkout coordinating orders, payments and inventory across services.
+4. Serverless file-processing pipeline that validates uploads, transforms files and notifies users.
+5. Multi-region disaster recovery for a customer portal, covering data replication, failover and recovery targets.
+
+### AI architecture
+
+1. Retrieval-augmented generation (RAG) assistant that answers questions from internal documents with source citations and access controls.
+2. Document extraction pipeline that uses AI to classify invoices, extract fields and route uncertain results for human review.
+3. **Agentic:** Customer support agent that investigates issues with account tools and requests approval before issuing refunds.
+4. **Agentic:** Incident investigation agent that queries logs and metrics, tests hypotheses and proposes remediation for operator approval.
+5. **Agentic:** Research agent that plans subtasks, searches sources and revises a cited report after a reviewer agent checks its claims.
