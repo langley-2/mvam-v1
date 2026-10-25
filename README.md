@@ -4,7 +4,7 @@ A local desktop workspace for architecture notes, diagrams, decisions and interv
 
 ## Download
 
-Download the Windows x64 installer or Apple Silicon macOS disk image from the [current published preview, v1.0.2](https://github.com/langley-2/mvam-v1/releases/tag/v1.0.2). These preview builds are not publisher-signed, so the operating system may show a security warning.
+Download the Windows x64 installer or Apple Silicon macOS disk image from the [releases page](https://github.com/langley-2/mvam-v1/releases). These preview builds are not publisher-signed, so the operating system may show a security warning.
 
 ## Develop
 
